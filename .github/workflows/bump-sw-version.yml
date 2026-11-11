@@ -1,0 +1,37 @@
+name: Bump SW Cache Version
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'index.html'
+      - 'css/**'
+      - 'js/**'
+      - 'manifest.webmanifest'
+      - 'icons/**'
+
+permissions:
+  contents: write
+
+jobs:
+  bump-version:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Bump cache version in sw.js
+        run: |
+          TIMESTAMP=$(date -u +"%Y%m%d-%H%M")
+          sed -i "s/const CACHE_VERSION = 'moodlog-v[^']*'/const CACHE_VERSION = 'moodlog-v${TIMESTAMP}'/" sw.js
+          echo "New version: moodlog-v${TIMESTAMP}"
+
+      - name: Commit updated sw.js
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add sw.js
+          git diff --staged --quiet || git commit -m "chore: bump SW cache version [skip ci]"
+          git push
