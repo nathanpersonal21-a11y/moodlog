@@ -1,6 +1,6 @@
 // Moodlog service worker — works offline, but always tries the network first so updates arrive on the next open.
 // The GitHub Action in .github/workflows bumps CACHE_VERSION whenever app files change.
-const CACHE_VERSION = 'moodlog-v20261111-0211';
+const CACHE_VERSION = 'moodlog-v20261112-0045';
 
 const STATIC_ASSETS = [
   './', './index.html', './manifest.webmanifest', './css/app.css',
