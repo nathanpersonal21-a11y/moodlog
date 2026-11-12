@@ -1,28 +1,26 @@
 /* Moodlog — journal list, search + filters, compose/edit entry, view entry */
 (function () {
   const ML = window.ML, $ = ML.$, esc = ML.esc, S = ML.S;
-  const F = { q: '', types: { text: true, voice: true, checkin: true }, min: 1, max: 100, from: '', to: '', tags: new Set(), tagMode: 'any', photoOnly: false };
+  const F = { q: '', types: { text: true, voice: true }, min: 1, max: 100, from: '', to: '', tags: new Set(), tagMode: 'any', photoOnly: false };
   let shown = 60;
 
-  const isFiltered = () => !!(F.q.trim() || !F.types.text || !F.types.voice || !F.types.checkin || F.min > 1 || F.max < 100 || F.from || F.to || F.tags.size || F.photoOnly);
+  const isFiltered = () => !!(F.q.trim() || !F.types.text || !F.types.voice || F.min > 1 || F.max < 100 || F.from || F.to || F.tags.size || F.photoOnly);
   const tagNames = r => (r.tags || []).map(ML.data.tagName).join(' ');
 
-  function matches(kind, r) {
-    const type = kind === 'checkin' ? 'checkin' : r.type;
-    if (!F.types[type]) return false;
+  function matches(r) {
+    if (!F.types[r.type]) return false;
     if (r.mood < F.min || r.mood > F.max) return false;
     const dk = ML.dayKey(r.ts);
     if (F.from && dk < F.from) return false;
     if (F.to && dk > F.to) return false;
-    if (F.photoOnly && !(kind === 'entry' && r.photoId)) return false;
+    if (F.photoOnly && !r.photoId) return false;
     if (F.tags.size) {
       const has = [...F.tags].map(t => (r.tags || []).includes(t));
       if (F.tagMode === 'all' ? !has.every(Boolean) : !has.some(Boolean)) return false;
     }
     const q = F.q.trim().toLowerCase();
     if (q) {
-      const hay = (kind === 'checkin' ? [r.label, r.note] : [r.text, r.transcript, r.moodLabel]).join(' ').toLowerCase();
-      const tn = tagNames(r).toLowerCase();
+      const hay = [r.text, r.transcript, r.moodLabel].join(' ').toLowerCase(), tn = tagNames(r).toLowerCase();
       for (const tok of q.split(/\s+/)) {
         if (tok[0] === '#') { const t = tok.slice(1); if (!t || !(r.tags || []).some(id => ML.data.tagName(id).toLowerCase().startsWith(t))) return false; }
         else if (!hay.includes(tok) && !tn.includes(tok)) return false;
@@ -38,7 +36,6 @@
     const box = $('#filter-chips'); const parts = [];
     if (!F.types.text) parts.push(['No written', () => F.types.text = true]);
     if (!F.types.voice) parts.push(['No voice', () => F.types.voice = true]);
-    if (!F.types.checkin) parts.push(['No check-ins', () => F.types.checkin = true]);
     if (F.min > 1 || F.max < 100) parts.push(['Mood ' + F.min + '–' + F.max, () => { F.min = 1; F.max = 100; }]);
     if (F.from || F.to) parts.push([(F.from || '…') + ' → ' + (F.to || '…'), () => { F.from = ''; F.to = ''; }]);
     [...F.tags].forEach(id => parts.push([ML.data.tagLabel(id) || 'tag', () => F.tags.delete(id)]));
@@ -65,40 +62,31 @@
   }
 
   function renderPrompt() {
-    const box = $('#ci-prompt'); const last = ML.data.latestCheckin();
+    const box = $('#ci-prompt'), last = ML.data.latestEntry();
     const stale = !last || Date.now() - last.ts > S.settings.checkinGapHours * 3600000;
     box.classList.toggle('hidden', isFiltered() || !stale);
-    if (stale) $('#ci-prompt-sub').textContent = last ? 'Last check-in ' + ML.fmtShort(last.ts) + ' · ' + ML.fmtTime(last.ts) : 'Log your mood in a few seconds';
+    if (stale) $('#ci-prompt-sub').textContent = last ? 'Last entry ' + ML.fmtShort(last.ts) + ' · ' + ML.fmtTime(last.ts) : 'Set your mood and add a few words';
   }
 
   function renderJournal() {
     renderFilterChips(); renderOTD(); renderPrompt();
     const list = $('#entries-list'); list.innerHTML = '';
-    const items = [];
-    S.entries.forEach(e => { if (matches('entry', e)) items.push({ k: 'entry', r: e }); });
-    S.checkins.forEach(c => { if (matches('checkin', c)) items.push({ k: 'checkin', r: c }); });
-    items.sort((a, b) => b.r.ts - a.r.ts);
+    const items = S.entries.filter(matches).sort((a, b) => b.ts - a.ts);
     const rc = $('#result-count');
     rc.classList.toggle('hidden', !isFiltered()); rc.textContent = items.length + (items.length === 1 ? ' result' : ' results');
     if (!items.length) {
-      list.innerHTML = '<div class="empty-state"><div class="empty-icon">' + (isFiltered() ? '⌕' : '✦') + '</div><p>' + (isFiltered() ? 'Nothing matches your search and filters.' : 'Your journal is empty. Tap Write or Voice below, or check in with the mood badge.') + '</p></div>';
+      list.innerHTML = '<div class="empty-state"><div class="empty-icon">' + (isFiltered() ? '⌕' : '✦') + '</div><p>' + (isFiltered() ? 'Nothing matches your search and filters.' : 'Your journal is empty. Tap Write or Voice below to add your first entry.') + '</p></div>';
       return;
     }
     let lastDay = '';
-    items.slice(0, shown).forEach(({ k, r }) => {
+    items.slice(0, shown).forEach(r => {
       const dk = ML.dayKey(r.ts);
       if (dk !== lastDay) { lastDay = dk; const h = document.createElement('div'); h.className = 'day-hdr'; h.textContent = ML.fmtDayHdr(dk); list.appendChild(h); }
-      const div = document.createElement('div');
-      if (k === 'checkin') {
-        div.className = 'entry-item compact';
-        div.innerHTML = '<div class="entry-ico">◐</div><div class="entry-main"><div class="entry-meta"><span class="entry-time">' + ML.fmtTime(r.ts) + '</span>' + moodSpan(r.mood, r.label) + '</div>' + (r.note ? '<div class="entry-preview">' + esc(r.note) + '</div>' : '') + (r.tags && r.tags.length ? '<div class="entry-tags">' + tagChips(r) + '</div>' : '') + '</div>';
-        div.onclick = () => ML.openCheckin({ editId: r.id, returnTo: 'smain' });
-      } else {
-        div.className = 'entry-item';
-        const pending = !r.synced && S.settings.scriptUrl;
-        div.innerHTML = '<div class="entry-ico">' + (r.type === 'voice' ? '🎙' : '✍') + '</div><div class="entry-main"><div class="entry-meta"><span class="entry-time">' + ML.fmtTime(r.ts) + '</span>' + moodSpan(r.mood, r.moodLabel) + '</div><div class="entry-preview">' + esc(r.transcript || r.text || (r.type === 'voice' ? '(voice note)' : '(photo)')) + '</div>' + (r.tags && r.tags.length ? '<div class="entry-tags">' + tagChips(r) + '</div>' : '') + (pending ? '<div class="entry-pending">⏳ waiting to back up</div>' : '') + '</div>' + (r.photoId ? '<img class="thumb-mini" alt="" data-p="' + esc(r.photoId) + '">' : '');
-        div.onclick = () => viewEntry(r.id);
-      }
+      const div = document.createElement('div'), body = r.transcript || r.text, moodOnly = !body && !r.photoId && r.type !== 'voice';
+      div.className = 'entry-item' + (moodOnly ? ' compact' : '');
+      const pending = !r.synced && S.settings.scriptUrl;
+      div.innerHTML = '<div class="entry-ico">' + (r.type === 'voice' ? '🎙' : moodOnly ? '◐' : '✍') + '</div><div class="entry-main"><div class="entry-meta"><span class="entry-time">' + ML.fmtTime(r.ts) + '</span>' + moodSpan(r.mood, r.moodLabel) + '</div>' + (moodOnly ? '' : '<div class="entry-preview">' + esc(body || (r.type === 'voice' ? '(voice note)' : '(photo)')) + '</div>') + (r.tags && r.tags.length ? '<div class="entry-tags">' + tagChips(r) + '</div>' : '') + (pending ? '<div class="entry-pending">⏳ waiting to back up</div>' : '') + '</div>' + (r.photoId ? '<img class="thumb-mini" alt="" data-p="' + esc(r.photoId) + '">' : '');
+      div.onclick = () => viewEntry(r.id);
       list.appendChild(div);
     });
     list.querySelectorAll('img[data-p]').forEach(async im => { const u = await ML.blob.url(im.dataset.p); if (u) im.src = u; else im.remove(); });
@@ -108,7 +96,7 @@
 
   // ── filter sheet ──
   function openFilters() {
-    const types = [['text', '✍ Written'], ['voice', '🎙 Voice'], ['checkin', '◐ Check-ins']];
+    const types = [['text', '✍ Written'], ['voice', '🎙 Voice']];
     ML.sheet('Filter', '<div><div class="field-label">Show</div><div class="chips" id="f-types"></div></div>'
       + '<div><div class="field-label">Mood range · <span id="f-rng">' + F.min + '–' + F.max + '</span></div><div class="range-pair"><input type="range" id="f-min" min="1" max="100" value="' + F.min + '"><input type="range" id="f-max" min="1" max="100" value="' + F.max + '"></div></div>'
       + '<div><div class="field-label">Dates</div><div class="range-pair"><input type="date" class="input" id="f-from" value="' + F.from + '"><span class="muted">→</span><input type="date" class="input" id="f-to" value="' + F.to + '"></div></div>'
@@ -126,7 +114,7 @@
         $('#f-to', el).onchange = e => { F.to = e.target.value; apply(); };
         const drawTags = () => {
           const tg = $('#f-tags', el); tg.innerHTML = '';
-          if (!S.tags.length) tg.innerHTML = '<span class="hint">No tags yet — add some when you write or check in.</span>';
+          if (!S.tags.length) tg.innerHTML = '<span class="hint">No tags yet — add some when you write an entry.</span>';
           S.tags.forEach(t => { const b = document.createElement('button'); b.className = 'chip' + (F.tags.has(t.id) ? ' on' : ''); b.textContent = (t.emoji ? t.emoji + ' ' : '') + t.name; b.onclick = () => { F.tags.has(t.id) ? F.tags.delete(t.id) : F.tags.add(t.id); drawTags(); apply(); }; tg.appendChild(b); });
           $('#f-any', el).classList.toggle('on', F.tagMode === 'any'); $('#f-all', el).classList.toggle('on', F.tagMode === 'all');
         };
@@ -139,7 +127,7 @@
       });
   }
   function resetFilters() {
-    F.q = ''; F.types = { text: true, voice: true, checkin: true }; F.min = 1; F.max = 100; F.from = ''; F.to = ''; F.tags = new Set(); F.tagMode = 'any'; F.photoOnly = false;
+    F.q = ''; F.types = { text: true, voice: true }; F.min = 1; F.max = 100; F.from = ''; F.to = ''; F.tags = new Set(); F.tagMode = 'any'; F.photoOnly = false;
     $('#q').value = ''; $('#q-clr').classList.add('hidden'); shown = 60; renderJournal();
   }
   ML.searchTag = id => { resetFilters(); F.tags.add(id); renderJournal(); ML.showTab('journal'); };
@@ -157,46 +145,41 @@
     }
     $('#battach').classList.toggle('hidden', !!cPhotoUrl);
   }
-  ML.refreshComposeMood = () => {
-    const last = ML.data.latestCheckin(); const rec = cId && S.entries.find(e => e.id === cId);
-    const m = rec ? rec.mood : last ? last.mood : null, l = rec ? rec.moodLabel : last ? last.label : '';
-    $('#c-mood').innerHTML = m == null ? '<span class="muted">No mood yet — tap to check in</span>' : '<b style="color:' + ML.moodColor(m) + '">' + m + '</b><span class="muted">' + esc(l || ML.moodWord(m)) + '</span>';
-    $('#c-mood-note').textContent = rec ? 'Mood when you wrote this' : 'Saved with this entry · tap to update';
-  };
+  let picker = null;
 
   async function openCompose(id) {
     cId = id || null; const rec = id ? S.entries.find(e => e.id === id) : null;
     cTags = new Set(rec ? rec.tags || [] : []); cLoc = rec ? rec.loc || null : null; cPhotoBlob = null; cPhotoRemoved = false;
     cHasPhoto = !!(rec && rec.photoId); cPhotoUrl = rec && rec.photoId ? await ML.blob.url(rec.photoId) : null;
     $('#compose-title').textContent = rec ? 'Edit entry' : 'New entry';
+    picker = ML.moodPicker($('#c-mood-picker'), { mood: rec ? rec.mood : ML.defaultMood(), label: rec ? rec.moodLabel : '' });
     $('#jtxt').value = rec ? (rec.type === 'voice' ? rec.transcript || '' : rec.text || '') : '';
     ML.tagPicker($('#c-tags'), cTags);
     const has = !!cLoc; $('#loc-status').classList.toggle('has', has);
     $('#loc-txt').textContent = has ? cLoc.lat.toFixed(4) + ', ' + cLoc.lon.toFixed(4) : 'Not attached'; $('#bgetloc').textContent = has ? 'Update' : 'Add';
     $('#ss-txt').textContent = ''; $('#ss-txt').className = 'save-status'; $('#bsavetxt').disabled = false;
-    drawPhotoRow(); ML.refreshComposeMood(); ML.ss('scompose');
-    if (!rec) setTimeout(() => $('#jtxt').focus(), 300);
+    drawPhotoRow(); ML.ss('scompose');
+    $('#compose-scroll').scrollTop = 0;
   }
   ML.openCompose = openCompose;
 
   async function saveCompose() {
     const text = $('#jtxt').value.trim();
     const isVoice = !!(cId && (S.entries.find(e => e.id === cId) || {}).type === 'voice');
-    if (!text && !cPhotoUrl && !isVoice) { ML.toast('Write something or add a photo first'); return; }
     const btn = $('#bsavetxt'); btn.disabled = true;
     try {
-      const last = ML.data.latestCheckin();
+      const m = picker.get();
       if (cId) {
         const rec = S.entries.find(e => e.id === cId); let photoId = rec.photoId;
         if (cPhotoBlob) { photoId = 'photo:' + cId; ML.blob.invalidate(photoId); await ML.blob.put(photoId, cPhotoBlob); }
         else if (cPhotoRemoved && photoId) { await ML.blob.del(photoId); photoId = null; }
-        const patch = { tags: [...cTags], loc: cLoc, photoId }; if (rec.type === 'voice') patch.transcript = text; else patch.text = text;
+        const patch = { tags: [...cTags], loc: cLoc, photoId, mood: m.mood, moodLabel: m.label }; if (rec.type === 'voice') patch.transcript = text; else patch.text = text;
         if (photoId !== rec.photoId || cPhotoBlob) patch.imageUrl = null;
         ML.data.updateEntry(cId, patch);
       } else {
         const id = ML.uid(); let photoId = null;
         if (cPhotoBlob) { photoId = 'photo:' + id; await ML.blob.put(photoId, cPhotoBlob); }
-        ML.data.addEntry({ id, ts: Date.now(), updatedAt: Date.now(), type: 'text', mood: last ? last.mood : 50, moodLabel: last ? last.label || '' : '', text, transcript: '', tags: [...cTags], loc: cLoc, photoId, audioId: null, imageUrl: null, driveUrl: null, synced: false, checkinId: last ? last.id : null });
+        ML.data.addEntry({ id, ts: Date.now(), updatedAt: Date.now(), type: 'text', mood: m.mood, moodLabel: m.label, text, transcript: '', tags: [...cTags], loc: cLoc, photoId, audioId: null, imageUrl: null, driveUrl: null, synced: false });
       }
       ML.refreshHome(); ML.toast(cId ? 'Entry updated' : 'Entry saved'); ML.ss('smain');
     } finally { btn.disabled = false; }
@@ -229,11 +212,10 @@
     $('#q').addEventListener('input', ML.debounce(e => { F.q = e.target.value; $('#q-clr').classList.toggle('hidden', !F.q); shown = 60; renderJournal(); }, 150));
     $('#q-clr').onclick = () => { $('#q').value = ''; F.q = ''; $('#q-clr').classList.add('hidden'); renderJournal(); };
     $('#bfilter').onclick = openFilters;
-    $('#ci-prompt').onclick = () => ML.openCheckin({ returnTo: 'smain' });
+    $('#ci-prompt').onclick = () => openCompose();
     $('#btxtentry').onclick = () => openCompose();
     $('#bcompback').onclick = () => ML.ss('smain');
     $('#bsavetxt').onclick = saveCompose;
-    $('#c-mood-row').onclick = () => ML.openCheckin({ returnTo: 'scompose' });
     $('#battach').onclick = () => $('#img-input').click();
     $('#img-input').onchange = async e => {
       const f = e.target.files[0]; e.target.value = ''; if (!f) return;
@@ -256,5 +238,4 @@
       }
     };
   };
-  ML.journalRecordLookup = { matches };
 })();

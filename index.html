@@ -8,6 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Moodlog">
 <meta name="theme-color" content="#0d0d0f">
+<meta name="format-detection" content="telephone=no">
 <title>Moodlog</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" id="apple-icon" href="icons/icon-180.png">
@@ -35,27 +36,11 @@
     <div class="lock-error" id="lock-error"></div>
   </div>
 
-  <!-- CHECK-IN -->
-  <div id="scheckin" class="screen">
-    <div class="ci-inner">
-      <div style="text-align:center"><div class="mood-logo">Moodlog</div><div class="mood-question" id="ci-title" style="margin-top:.5rem">How are you feeling<br>right now?</div><div class="mood-date-lbl" id="ci-date"></div></div>
-      <div class="dial-wrap">
-        <canvas id="dialcanvas" tabindex="0" aria-label="Mood dial"></canvas>
-        <div class="dial-center"><div class="dial-val" id="dialval">50</div><div class="dial-word" id="dialword">Okay</div></div>
-      </div>
-      <div class="dial-fine"><button id="dial-minus" aria-label="Lower">−</button><span>DRAG · TAP · HOLD</span><button id="dial-plus" aria-label="Raise">+</button></div>
-      <div class="ci-section"><div class="field-label">Name the feeling</div><input class="pill-input" id="ci-label" maxlength="40" placeholder="e.g. anxious, calm, hopeful…" autocomplete="off" autocapitalize="sentences"><div class="chips" id="ci-quick" style="margin-top:.6rem"></div></div>
-      <div class="ci-section"><div class="field-label">What have you been up to?</div><div class="chips" id="ci-tags"></div></div>
-      <div class="ci-section"><div class="field-label">Quick note (optional)</div><input class="pill-input" id="ci-note" maxlength="200" placeholder="Anything on your mind…" autocomplete="off" autocapitalize="sentences"></div>
-      <div class="ci-actions"><button class="btn-primary" id="ci-save">Save check-in</button><button class="btn-danger hidden" id="ci-del">Delete check-in</button><button class="btn-secondary" id="ci-skip">Skip for now</button></div>
-    </div>
-  </div>
-
   <!-- MAIN -->
   <div id="smain" class="screen">
     <div class="home-hdr">
       <div class="home-logo"><img id="home-logo-img" alt="" style="display:none">Moodlog</div>
-      <div class="mood-badge" id="mood-badge" role="button" tabindex="0"><span class="badge-score mono" id="pillsc">—</span><span class="badge-lbl" id="pilllbl">check in</span></div>
+      <div class="mood-badge" id="mood-badge" role="button" tabindex="0"><span class="badge-score mono" id="pillsc">—</span><span class="badge-lbl" id="pilllbl">log mood</span></div>
     </div>
     <div class="panels">
       <div class="tab-panel active" id="tab-journal">
@@ -66,7 +51,7 @@
         <div class="filter-chips chips hidden" id="filter-chips"></div>
         <div class="result-count hidden" id="result-count"></div>
         <div class="scroll" id="journal-scroll">
-          <div class="card ci-prompt hidden" id="ci-prompt"><div class="entry-ico">◐</div><div class="grow"><div class="t">How are you feeling?</div><div class="s" id="ci-prompt-sub"></div></div><span class="muted">›</span></div>
+          <div class="card ci-prompt hidden" id="ci-prompt"><div class="entry-ico">◐</div><div class="grow"><div class="t">Log how you feel</div><div class="s" id="ci-prompt-sub"></div></div><span class="muted">›</span></div>
           <div id="otd-banner" class="otd-banner hidden"><div class="otd-header" id="otd-header"><div class="otd-title">✦ On this day</div><div class="otd-chev">▼</div></div><div class="otd-body" id="otd-body"></div></div>
           <div id="entries-list"></div>
         </div>
@@ -75,12 +60,18 @@
           <button class="fab voice" id="bvoiceentry"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0014 0M12 19v3M8 22h8"/></svg>Voice</button>
         </div>
       </div>
+      <div class="tab-panel" id="tab-todo">
+        <div class="todo-top"><div id="td-week" class="wk-row"></div><div id="td-head" class="td-head"></div>
+          <div class="td-add"><input class="pill-input" id="td-input" maxlength="120" placeholder="Add a task for this day…" autocomplete="off" autocapitalize="sentences" enterkeyhint="done"><button class="btn-icon" id="td-addbtn" aria-label="Add task">＋</button></div></div>
+        <div class="scroll"><div class="todo-body" id="td-list"></div></div>
+      </div>
       <div class="tab-panel" id="tab-trends"><div class="scroll"><div class="trends-body" id="trends-body"></div></div></div>
       <div class="tab-panel" id="tab-habits"><div class="scroll"><div class="habits-body" id="habits-body"></div></div></div>
       <div class="tab-panel" id="tab-settings"><div class="scroll"><div class="set-body" id="settings-body"></div></div></div>
     </div>
     <nav class="tab-bar">
       <button class="tab active" data-tab="journal"><svg viewBox="0 0 24 24"><path d="M4 5a2 2 0 012-2h13v16H6a2 2 0 00-2 2V5z"/><path d="M4 19a2 2 0 012-2h13"/></svg>Journal</button>
+      <button class="tab" data-tab="todo"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 12.5l3 3 5-6"/></svg>To-do</button>
       <button class="tab" data-tab="trends"><svg viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 8-9"/><path d="M15 6h6v6"/></svg>Trends</button>
       <button class="tab" data-tab="habits"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l3 3 5-6"/></svg>Habits</button>
       <button class="tab" data-tab="settings"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>Settings</button>
@@ -90,10 +81,10 @@
   <!-- COMPOSE -->
   <div id="scompose" class="screen">
     <div class="sub-hdr"><button class="btn-back" id="bcompback" aria-label="Back">←</button><div class="sub-title" id="compose-title">New entry</div></div>
-    <div class="scroll"><div class="body-pad">
+    <div class="scroll" id="compose-scroll"><div class="body-pad">
+      <div id="c-mood-picker"></div>
       <div><div class="field-label">Your thoughts</div><textarea id="jtxt" placeholder="What's on your mind…" autocapitalize="sentences" spellcheck="true"></textarea></div>
       <div><div class="field-label">Tags</div><div class="chips" id="c-tags"></div></div>
-      <div class="card mood-chip" id="c-mood-row"><div id="c-mood" class="row" style="gap:.7rem"></div><div class="grow"></div><div class="hint" id="c-mood-note"></div></div>
       <div><div class="field-label">Photo</div><div class="img-row" id="img-row"><button class="btn-attach" id="battach" type="button"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>Add photo</button><input type="file" id="img-input" accept="image/*" style="display:none"></div></div>
       <div><div class="field-label">Location</div><div class="loc-row"><div class="loc-status" id="loc-status">📍 <span id="loc-txt">Not attached</span></div><button class="btn-small" id="bgetloc">Add</button></div></div>
     </div></div>
@@ -113,7 +104,7 @@
         <audio id="v-audio" controls preload="metadata"></audio>
         <div><div class="field-label">Transcript — fix any words</div><textarea class="ta" id="v-text" placeholder="Nothing was transcribed — you can type here."></textarea><div class="row" style="margin-top:.5rem"><button class="btn-small" id="vimprove">✨ Improve with cloud model</button><div class="hint grow" id="vcloud"></div></div></div>
         <div><div class="field-label">Tags</div><div class="chips" id="v-tags"></div></div>
-        <div class="hint" id="v-mood"></div>
+        <div id="v-mood-picker"></div>
         <div class="loc-row"><div class="loc-status" id="vloc-status">📍 <span id="vloc-txt">No location</span></div><button class="btn-small" id="bvgetloc">Add</button></div>
         <button class="btn-primary" id="vsave">Save voice entry</button><button class="btn-secondary" id="vdiscard">Discard</button><div class="save-status" id="vss"></div>
       </div>
@@ -136,9 +127,10 @@
 <script src="js/ui.js"></script>
 <script src="js/lock.js"></script>
 <script src="js/dial.js"></script>
-<script src="js/checkin.js"></script>
+<script src="js/celebrate.js"></script>
 <script src="js/journal.js"></script>
 <script src="js/voice.js"></script>
+<script src="js/todo.js"></script>
 <script src="js/habits.js"></script>
 <script src="js/trends.js"></script>
 <script src="js/sync.js"></script>

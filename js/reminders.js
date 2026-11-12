@@ -14,7 +14,7 @@
     schedule,
     async push() {
       if (!S.settings.scriptUrl) throw new Error('Set your Apps Script URL first (Settings → Backup)');
-      const j = await ML.sync.post({ action: 'setReminders', enabled: S.settings.reminders.enabled, days: schedule(), title: 'Moodlog check-in', appUrl: location.href.split('#')[0] });
+      const j = await ML.sync.post({ action: 'setReminders', enabled: S.settings.reminders.enabled, days: schedule(), title: 'Moodlog journal', appUrl: location.href.split('#')[0] });
       if (!j || !j.success) throw new Error((j && j.error) || 'Apps Script did not accept the reminders — update it from the README');
       S.settings.reminders.lastSync = Date.now(); ML.save('settings'); return j;
     },

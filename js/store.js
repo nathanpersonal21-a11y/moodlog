@@ -12,13 +12,13 @@
 
   const defaultSettings = () => ({
     theme: 'midnight', bgDim: 55, bgBlur: 6, hasBg: false, hasIcon: false,
-    scriptUrl: '', scriptToken: '', haptics: true, lockAfter: 5, checkinGapHours: 4,
+    scriptUrl: '', scriptToken: '', haptics: true, lockAfter: 5, checkinGapHours: 4, confetti: true, sound: false,
     cloudProvider: 'off', cloudKey: '',
     reminders: { enabled: false, same: true, time: '20:00', days: Array.from({ length: 7 }, () => ({ on: true, time: '20:00' })), lastSync: 0 }
   });
 
-  const S = (ML.S = { settings: defaultSettings(), checkins: [], entries: [], habits: [], habitLog: {}, tags: [], queue: [] });
-  const KEYS = { settings: 'ml2_settings', checkins: 'ml2_checkins', entries: 'ml2_entries', habits: 'ml2_habits', habitLog: 'ml2_habitlog', tags: 'ml2_tags', queue: 'ml2_queue' };
+  const S = (ML.S = { settings: defaultSettings(), checkins: [], entries: [], habits: [], habitLog: {}, tags: [], todos: [], queue: [] });
+  const KEYS = { settings: 'ml2_settings', checkins: 'ml2_checkins', entries: 'ml2_entries', habits: 'ml2_habits', habitLog: 'ml2_habitlog', tags: 'ml2_tags', todos: 'ml2_todos', queue: 'ml2_queue' };
   ML.save = k => LS.set(KEYS[k], S[k]);
 
   // ── IndexedDB blobs ──
@@ -69,13 +69,7 @@
       if (e.audioId) await ML.blob.del(e.audioId);
       enqueue('delete', 'entry', id);
     },
-    addCheckin(c) { S.checkins.push(c); ML.save('checkins'); enqueue('upsert', 'checkin', c.id); return c; },
-    updateCheckin(id, patch) {
-      const c = S.checkins.find(x => x.id === id); if (!c) return null;
-      Object.assign(c, patch, { updatedAt: Date.now(), synced: false }); ML.save('checkins'); enqueue('upsert', 'checkin', id); return c;
-    },
-    deleteCheckin(id) { S.checkins = S.checkins.filter(x => x.id !== id); ML.save('checkins'); enqueue('delete', 'checkin', id); },
-    latestCheckin() { return S.checkins.reduce((a, c) => (!a || c.ts > a.ts ? c : a), null); },
+    latestEntry() { return S.entries.reduce((a, c) => (!a || c.ts > a.ts ? c : a), null); },
 
     // tags
     tag: id => S.tags.find(t => t.id === id),
@@ -88,10 +82,9 @@
     renameTag(id, name, emoji) { const t = S.tags.find(x => x.id === id); if (!t) return; t.name = String(name).trim().slice(0, 24) || t.name; t.emoji = (emoji || '').trim().slice(0, 4); ML.save('tags'); },
     deleteTag(id) {
       S.tags = S.tags.filter(t => t.id !== id); ML.save('tags');
-      let ce = false, cc = false;
+      let ce = false;
       S.entries.forEach(e => { if ((e.tags || []).includes(id)) { e.tags = e.tags.filter(x => x !== id); e.synced = false; enqueue('upsert', 'entry', e.id); ce = true; } });
-      S.checkins.forEach(c => { if ((c.tags || []).includes(id)) { c.tags = c.tags.filter(x => x !== id); c.synced = false; enqueue('upsert', 'checkin', c.id); cc = true; } });
-      if (ce) ML.save('entries'); if (cc) ML.save('checkins');
+      if (ce) ML.save('entries');
     },
     tagLabel(id) { const t = S.tags.find(x => x.id === id); return t ? ((t.emoji ? t.emoji + ' ' : '') + t.name) : ''; },
 
@@ -129,7 +122,8 @@
     const st = LS.get(KEYS.settings, null);
     if (st) { const d = defaultSettings(); S.settings = Object.assign(d, st, { reminders: Object.assign(d.reminders, st.reminders || {}) }); }
     S.checkins = LS.get(KEYS.checkins, []); S.entries = LS.get(KEYS.entries, []); S.habits = LS.get(KEYS.habits, []);
-    S.habitLog = LS.get(KEYS.habitLog, {}); S.tags = LS.get(KEYS.tags, []); S.queue = LS.get(KEYS.queue, []);
+    S.habitLog = LS.get(KEYS.habitLog, {}); S.tags = LS.get(KEYS.tags, []); S.todos = LS.get(KEYS.todos, []); S.queue = LS.get(KEYS.queue, []);
+    foldCheckinsIntoEntries();
     if (!localStorage.getItem('ml2_migrated')) {
       try { await migrate(); } catch (e) { console.error('migration failed', e); }
       try { localStorage.setItem('ml2_migrated', '1'); } catch (e) {}
@@ -137,11 +131,28 @@
     try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
   };
 
+  // Check-ins used to be a separate record. Mood now lives on the entry itself, so any old check-in becomes a mood-only entry.
+  function foldCheckinsIntoEntries() {
+    const old = LS.get(KEYS.checkins, []);
+    let changed = false;
+    old.forEach(c => {
+      if (c.legacy) return; // these only duplicated moods that old entries already carry
+      if (S.entries.some(e => e.id === c.id)) return;
+      const e = { id: c.id, ts: c.ts, updatedAt: c.updatedAt || c.ts, type: 'text', mood: c.mood, moodLabel: c.label || '', text: c.note || '', transcript: '', tags: c.tags || [], loc: null, photoId: null, audioId: null, imageUrl: null, driveUrl: null, synced: !!c.synced };
+      S.entries.push(e); changed = true;
+      if (!e.synced) S.queue.push({ op: 'upsert', kind: 'entry', id: e.id });
+    });
+    let qChanged = false;
+    S.queue.forEach(q => { if (q.kind === 'checkin') { q.kind = 'entry'; qChanged = true; } });
+    if (old.length || localStorage.getItem(KEYS.checkins) !== null) { try { localStorage.removeItem(KEYS.checkins); } catch (e) {} }
+    S.checkins = [];
+    if (changed) ML.save('entries'); if (changed || qChanged) ML.save('queue');
+  }
+
   async function migrate() {
     const oldEntries = LS.get('ml_entries', null), oldHabits = LS.get('ml_habits', null);
     if (oldEntries === null && oldHabits === null) return;
     const url = localStorage.getItem('ml_script_url'); if (url && !S.settings.scriptUrl) S.settings.scriptUrl = url;
-    const seen = new Set();
     for (const o of (oldEntries || [])) {
       const id = String(o.id);
       if (S.entries.some(e => e.id === id)) continue;
@@ -150,13 +161,11 @@
         try { const r = await fetch(o.imgB64); const b = await r.blob(); e.photoId = 'photo:' + id; await ML.blob.put(e.photoId, b); } catch (err) {}
       }
       S.entries.push(e);
-      const k = ML.dayKey(o.ts) + '|' + o.mood + '|' + (o.moodLabel || '');
-      if (!seen.has(k)) { seen.add(k); S.checkins.push({ id: 'm' + id, ts: o.ts, updatedAt: o.ts, mood: o.mood || 50, label: o.moodLabel || '', note: '', tags: [], synced: true, legacy: true }); }
     }
     S.queue = S.entries.filter(e => !e.synced).map(e => ({ op: 'upsert', kind: 'entry', id: e.id }));
     for (const h of (oldHabits || [])) S.habits.push({ id: String(h.id), name: h.name, emoji: '✨', days: [], created: Number(h.id) || Date.now() });
     const log = LS.get('ml_habit_log', {});
     Object.keys(log).forEach(k => { const d = new Date(k); if (isNaN(d)) return; const key = ML.dayKey(d); S.habitLog[key] = (log[k] || []).map(String); });
-    ['entries', 'checkins', 'habits', 'habitLog', 'queue', 'settings'].forEach(ML.save);
+    ['entries', 'habits', 'habitLog', 'queue', 'settings'].forEach(ML.save);
   }
 })();

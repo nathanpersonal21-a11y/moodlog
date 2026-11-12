@@ -16,7 +16,7 @@ input,textarea,select{font-family:inherit;color:var(--text);-webkit-user-select:
 #bg-layer{background-size:cover;background-position:center;z-index:0}
 #bg-dim{z-index:1}
 html.has-bg #bg-layer,html.has-bg #bg-dim{display:block}
-#app{position:relative;z-index:2;height:100dvh;display:flex;flex-direction:column;overflow:hidden;padding-top:var(--safe-top)}
+#app{position:relative;z-index:2;height:var(--vvh,100dvh);display:flex;flex-direction:column;overflow:hidden;padding-top:var(--safe-top)}
 .screen{display:none;flex-direction:column;flex:1;min-height:0;overflow:hidden;background:var(--bg)}
 .screen.active{display:flex}
 html.has-bg .screen{background:transparent}
@@ -82,14 +82,15 @@ input[type=time]{min-width:110px}
 .lock-key:active{background:var(--bg3);transform:scale(.95)}
 .lock-error{font-size:13px;color:var(--danger);font-family:'DM Mono',monospace;min-height:18px;text-align:center}
 
-/* check-in */
-#scheckin{align-items:center;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:1.25rem 1.5rem calc(1.5rem + var(--safe-bottom))}
-.ci-inner{width:100%;max-width:380px;display:flex;flex-direction:column;align-items:center;gap:1.1rem;margin:auto 0}
+/* mood picker (inside entries) */
 .mood-logo{font-family:'DM Serif Display',serif;font-size:13px;letter-spacing:.25em;color:var(--gold);text-transform:uppercase;opacity:.8}
 .mood-question{font-family:'DM Serif Display',serif;font-size:25px;line-height:1.2;font-style:italic;text-align:center}
 .mood-date-lbl{font-size:12px;color:var(--text3);font-family:'DM Mono',monospace;margin-top:.3rem;letter-spacing:.05em;text-align:center}
-.dial-wrap{position:relative;width:260px;height:260px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-bottom:-2.6rem}
-#dialcanvas{position:absolute;inset:0;width:260px;height:260px;touch-action:none;cursor:grab;outline:none}
+.mood-card{display:flex;flex-direction:column;align-items:center;gap:.5rem;padding:1rem 1rem 1.1rem}
+.mood-card .field-label{align-self:flex-start}
+.dial-wrap{position:relative;width:var(--ds,232px);height:var(--ds,232px);display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-bottom:-1.6rem}
+.dial-canvas{position:absolute;inset:0;width:var(--ds,232px);height:var(--ds,232px);touch-action:none;cursor:grab;outline:none}
+.mp-label{width:100%;display:flex;flex-direction:column;gap:.6rem;margin-top:.3rem}
 .dial-center{position:relative;text-align:center;pointer-events:none}
 .dial-val{font-family:'DM Serif Display',serif;font-size:66px;line-height:1;transition:color .2s}
 .dial-word{font-size:12px;font-family:'DM Mono',monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--text3);margin-top:.15rem}
@@ -97,8 +98,6 @@ input[type=time]{min-width:110px}
 .dial-fine button{width:44px;height:44px;border-radius:50%;border:1px solid var(--border);background:var(--bg2);font-size:22px;color:var(--gold);cursor:pointer}
 .dial-fine button:active{background:var(--bg3);transform:scale(.94)}
 .dial-fine span{font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;letter-spacing:.08em}
-.ci-section{width:100%}
-.ci-actions{width:100%;display:flex;flex-direction:column;gap:.6rem}
 
 /* home */
 #smain{background:var(--bg)}
@@ -301,3 +300,32 @@ svg text{font-family:'DM Mono',monospace;fill:var(--text3);font-size:9px}
 #toast{position:fixed;bottom:calc(84px + var(--safe-bottom));left:50%;transform:translateX(-50%) translateY(20px);background:var(--bg3);border:1px solid var(--border);border-radius:100px;padding:.6rem 1.25rem;font-size:13px;color:var(--text);opacity:0;transition:opacity .3s,transform .3s;pointer-events:none;z-index:300;max-width:calc(100vw - 2rem);text-align:center}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .banner{background:var(--bg2);border:1px solid var(--gold-dim);border-radius:14px;padding:.8rem 1rem;font-size:13px;color:var(--text2);line-height:1.5;margin:.6rem 1.25rem 0}
+
+/* to-do */
+.todo-top{flex-shrink:0;padding:.6rem 1.25rem .4rem;display:flex;flex-direction:column;gap:.7rem}
+.wk-row{display:flex;align-items:center;gap:.2rem}.wk-row .week{flex:1;min-width:0}
+.wk-nav{width:34px;height:44px;flex-shrink:0;background:none;border:none;color:var(--gold);font-size:26px;cursor:pointer}
+.td-head{display:flex;flex-direction:column;gap:.55rem}
+.td-head .row{display:flex;align-items:center;gap:.6rem}
+.td-prog{display:flex;flex-direction:column;gap:.3rem}
+.td-add{display:flex;gap:.5rem;align-items:center}
+.td-add .btn-icon{font-size:24px;color:var(--gold);flex-shrink:0}
+.todo-body{padding:.4rem 1.25rem 2rem;display:flex;flex-direction:column;gap:.55rem}
+.td-row{display:flex;align-items:center;gap:.8rem;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius);padding:.5rem .6rem .5rem .6rem;transition:opacity .2s}
+.td-row.done{opacity:.6}.td-row.done .td-title{text-decoration:line-through;color:var(--text3)}
+.td-title{flex:1;min-width:0;font-size:16px;line-height:1.35;word-break:break-word;padding:.35rem 0}
+.td-more{width:44px;height:44px;flex-shrink:0;background:none;border:none;color:var(--text3);font-size:22px;cursor:pointer}
+#confetti{position:fixed;left:0;top:0;pointer-events:none;z-index:400;display:none}
+.entry-item.compact{padding-top:.55rem;padding-bottom:.55rem}
+
+/* iPhone */
+html{overscroll-behavior:none}
+button,.tab,.chip,.wday,.fab,.lock-key,.btn-small,.btn-icon,.entry-item{touch-action:manipulation;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+input,textarea,select{font-size:16px}
+.pill-input,.input,.select{font-size:16px}
+input[type=search]::-webkit-search-cancel-button{-webkit-appearance:none}
+input[type=date]{min-width:0;max-width:100%}
+.scroll{overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+.tab{min-height:48px}.btn-back{min-width:44px;min-height:44px}
+#app{padding-left:var(--safe-left);padding-right:var(--safe-right)}
+:root{--safe-left:env(safe-area-inset-left,0px);--safe-right:env(safe-area-inset-right,0px)}

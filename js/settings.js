@@ -14,7 +14,7 @@
       + (st.hasBg ? '<div><div class="field-label">Dim · ' + st.bgDim + '%</div><input type="range" id="s-dim" min="0" max="90" value="' + st.bgDim + '"></div><div><div class="field-label">Blur cards · ' + st.bgBlur + 'px</div><input type="range" id="s-blur" min="0" max="20" value="' + st.bgBlur + '"></div>' : '')
       + '</div><div class="card"><div class="set-line"><div class="row"><img class="icon-prev" id="s-icon-prev" alt="" src="icons/icon-192.png"><div><div class="l">App icon</div><div class="d">Changes the logo inside the app now. iPhone fixes the Home Screen icon when you add the app, so remove and re-add it to see a new one.</div></div></div></div><div class="chips" style="margin-top:.7rem"><button class="chip sm" id="s-icon">Choose picture</button>' + (st.hasIcon ? '<button class="chip sm" id="s-icon-rm">Reset</button>' : '') + '</div></div></div>';
     // Reminders
-    h += '<div class="set-sec"><div class="set-h">Reminders</div><div class="card" style="display:flex;flex-direction:column;gap:.9rem"><div class="set-line"><div><div class="l">Daily check-in reminder</div><div class="d">Arrives as a notification from your phone’s calendar app (set up in Backup below).</div></div>' + sw('s-rem', rm.enabled) + '</div>';
+    h += '<div class="set-sec"><div class="set-h">Reminders</div><div class="card" style="display:flex;flex-direction:column;gap:.9rem"><div class="set-line"><div><div class="l">Daily journal reminder</div><div class="d">Arrives as a notification from your phone’s calendar app (set up in Backup below).</div></div>' + sw('s-rem', rm.enabled) + '</div>';
     if (rm.enabled) {
       h += '<div class="set-line"><span class="l">Same time every day</span>' + sw('s-same', rm.same) + '</div>';
       if (rm.same) h += '<div class="set-line"><span class="l">Time</span><input type="time" class="input" id="s-time" value="' + rm.time + '" style="width:auto"></div>';
@@ -29,7 +29,8 @@
     // Voice
     h += '<div class="set-sec"><div class="set-h">Voice transcription</div><div class="card" style="display:flex;flex-direction:column;gap:.8rem"><div class="hint">By default voice notes use your phone’s built-in speech recognition. When you’re online you can also let a better cloud model re-transcribe each recording (nothing to download). It needs your own API key — Groq has a free tier. The key stays on this device.</div><select class="select" id="s-cloud"><option value="off"' + (st.cloudProvider === 'off' ? ' selected' : '') + '>Phone speech recognition only</option><option value="groq"' + (st.cloudProvider === 'groq' ? ' selected' : '') + '>Cloud model — Groq (free tier)</option><option value="openai"' + (st.cloudProvider === 'openai' ? ' selected' : '') + '>Cloud model — OpenAI (paid)</option></select>' + (st.cloudProvider !== 'off' ? '<input type="password" class="input mono" id="s-cloudkey" placeholder="API key" value="' + esc(st.cloudKey) + '" autocomplete="off" style="font-size:12.5px">' : '') + '</div></div>';
     // Lock & feel
-    h += '<div class="set-sec"><div class="set-h">Lock &amp; feel</div><div class="card" style="display:flex;flex-direction:column;gap:.9rem"><div class="set-line"><div><div class="l">Lock again after being away</div><div class="d">Passcode screen when you come back to the app.</div></div><select class="select" id="s-lock" style="width:auto"><option value="0">Immediately</option><option value="1">1 minute</option><option value="5">5 minutes</option><option value="15">15 minutes</option><option value="60">1 hour</option><option value="-1">Only on app start</option></select></div><div class="set-line"><div><div class="l">Haptic feedback</div><div class="d">Little taps on the dial and buttons.</div></div>' + sw('s-hap', st.haptics) + '</div><div class="set-line"><div><div class="l">Check-in nudge</div><div class="d">Show a prompt on Journal after this long.</div></div><select class="select" id="s-gap" style="width:auto"><option value="2">2 hours</option><option value="4">4 hours</option><option value="8">8 hours</option><option value="24">1 day</option></select></div></div></div>';
+    h += '<div class="set-sec"><div class="set-h">Lock &amp; feel</div><div class="card" style="display:flex;flex-direction:column;gap:.9rem"><div class="set-line"><div><div class="l">Lock again after being away</div><div class="d">Passcode screen when you come back to the app.</div></div><select class="select" id="s-lock" style="width:auto"><option value="0">Immediately</option><option value="1">1 minute</option><option value="5">5 minutes</option><option value="15">15 minutes</option><option value="60">1 hour</option><option value="-1">Only on app start</option></select></div><div class="set-line"><div><div class="l">Haptic feedback</div><div class="d">Little taps on the dial and buttons.</div></div>' + sw('s-hap', st.haptics) + '</div><div class="set-line"><div><div class="l">Journal nudge</div><div class="d">Show a “log how you feel” prompt after this long without an entry.</div></div><select class="select" id="s-gap" style="width:auto"><option value="2">2 hours</option><option value="4">4 hours</option><option value="8">8 hours</option><option value="24">1 day</option></select></div></div></div>';
+    h += '<div class="set-sec"><div class="set-h">Celebrations</div><div class="card" style="display:flex;flex-direction:column;gap:.9rem"><div class="set-line"><div><div class="l">Confetti</div><div class="d">When you tick off a to-do or a habit.</div></div>' + sw('s-conf', st.confetti !== false) + '</div><div class="set-line"><div><div class="l">Celebration sound</div><div class="d">A little chime with the confetti. The iPhone silent switch mutes it.</div></div>' + sw('s-snd', !!st.sound) + '</div><button class="btn-secondary" id="s-celeb">🎉 Try it</button></div></div>';
     // Data
     h += '<div class="set-sec"><div class="set-h">Your data</div><div class="card" style="display:flex;flex-direction:column;gap:.7rem"><div class="hint" id="s-storage">Calculating storage…</div><button class="btn-secondary" id="s-export">Export backup (JSON)</button><button class="btn-secondary" id="s-import">Import backup</button></div><div class="hint" style="text-align:center">Moodlog v2 · everything is stored on this device' + (st.scriptUrl ? ' and backed up to your sheet' : '') + '</div></div>';
     body.innerHTML = h; wire(body); fillDynamic(body);
@@ -39,8 +40,8 @@
     $('#s-lock', body).value = String(S.settings.lockAfter); $('#s-gap', body).value = String(S.settings.checkinGapHours);
     ML.blob.url('icon').then(u => { if (u && S.settings.hasIcon) $('#s-icon-prev', body).src = u; });
     renderTags(body); ML.updateSyncStatus();
-    if (navigator.storage && navigator.storage.estimate) navigator.storage.estimate().then(e => { const el = $('#s-storage', body); if (el) el.textContent = 'Storage used: ' + (e.usage / 1048576).toFixed(1) + ' MB' + (e.quota ? ' of ' + Math.round(e.quota / 1048576) + ' MB available' : '') + ' · ' + S.entries.length + ' entries, ' + S.checkins.length + ' check-ins'; });
-    else $('#s-storage', body).textContent = S.entries.length + ' entries, ' + S.checkins.length + ' check-ins';
+    if (navigator.storage && navigator.storage.estimate) navigator.storage.estimate().then(e => { const el = $('#s-storage', body); if (el) el.textContent = 'Storage used: ' + (e.usage / 1048576).toFixed(1) + ' MB' + (e.quota ? ' of ' + Math.round(e.quota / 1048576) + ' MB available' : '') + ' · ' + S.entries.length + ' entries, ' + S.todos.length + ' tasks'; });
+    else $('#s-storage', body).textContent = S.entries.length + ' entries, ' + S.todos.length + ' tasks';
   }
 
   ML.updateSyncStatus = () => {
@@ -58,7 +59,7 @@
       const save = () => ML.data.renameTag(t.id, nm.value, em.value);
       em.onchange = save; nm.onchange = save;
       sr.onclick = () => ML.searchTag(t.id);
-      dl.onclick = async () => { if (await ML.confirm('Delete tag?', 'Removes "' + t.name + '" from every entry and check-in.', 'Delete', true)) { ML.data.deleteTag(t.id); renderTags(body); ML.renderJournal(); } };
+      dl.onclick = async () => { if (await ML.confirm('Delete tag?', 'Removes "' + t.name + '" from every entry.', 'Delete', true)) { ML.data.deleteTag(t.id); renderTags(body); ML.renderJournal(); } };
       box.appendChild(row);
     });
   }
@@ -99,11 +100,14 @@
     const ck = $('#s-cloudkey', body); if (ck) ck.onchange = e => { S.settings.cloudKey = e.target.value.trim(); ML.save('settings'); };
     $('#s-lock', body).onchange = e => { S.settings.lockAfter = +e.target.value; ML.save('settings'); };
     $('#s-gap', body).onchange = e => { S.settings.checkinGapHours = +e.target.value; ML.save('settings'); ML.renderJournal(); };
+    $('#s-conf', body).onchange = e => { S.settings.confetti = e.target.checked; ML.save('settings'); };
+    $('#s-snd', body).onchange = e => { S.settings.sound = e.target.checked; ML.save('settings'); if (e.target.checked) { ML.sound.unlock(); ML.sound.play('ping'); } };
+    $('#s-celeb', body).onclick = () => ML.celebrate($('#s-celeb', body), true);
     $('#s-hap', body).onchange = e => { S.settings.haptics = e.target.checked; ML.save('settings'); if (e.target.checked) ML.haptic('bump'); };
 
     $('#s-export', body).onclick = async () => {
       const set = Object.assign({}, S.settings); delete set.cloudKey; delete set.scriptToken;
-      const data = JSON.stringify({ app: 'moodlog', version: 2, exportedAt: new Date().toISOString(), settings: set, checkins: S.checkins, entries: S.entries, habits: S.habits, habitLog: S.habitLog, tags: S.tags }, null, 1);
+      const data = JSON.stringify({ app: 'moodlog', version: 2, exportedAt: new Date().toISOString(), settings: set, entries: S.entries, todos: S.todos, habits: S.habits, habitLog: S.habitLog, tags: S.tags }, null, 1);
       const file = new File([data], 'moodlog-backup-' + ML.todayKey() + '.json', { type: 'application/json' });
       try { if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: 'Moodlog backup' }); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
       const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = file.name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
@@ -114,10 +118,11 @@
         let n = 0; const has = (arr, id) => arr.some(x => x.id === id);
         (d.tags || []).forEach(t => { if (!has(S.tags, t.id)) S.tags.push(t); });
         (d.entries || []).forEach(e => { if (!has(S.entries, e.id)) { e.photoId = null; e.audioId = null; e.synced = false; S.entries.push(e); n++; } });
-        (d.checkins || []).forEach(c => { if (!has(S.checkins, c.id)) { c.synced = false; S.checkins.push(c); n++; } });
+        (d.checkins || []).forEach(c => { if (!c.legacy && !has(S.entries, c.id)) { S.entries.push({ id: c.id, ts: c.ts, updatedAt: c.updatedAt || c.ts, type: 'text', mood: c.mood, moodLabel: c.label || '', text: c.note || '', transcript: '', tags: c.tags || [], loc: null, photoId: null, audioId: null, imageUrl: null, driveUrl: null, synced: false }); n++; } });
+        (d.todos || []).forEach(t => { if (!has(S.todos, t.id)) { S.todos.push(t); n++; } });
         (d.habits || []).forEach(h => { if (!has(S.habits, h.id)) S.habits.push(h); });
         Object.keys(d.habitLog || {}).forEach(k => { const a = S.habitLog[k] || []; S.habitLog[k] = [...new Set([...a, ...d.habitLog[k]])]; });
-        ['tags', 'entries', 'checkins', 'habits', 'habitLog'].forEach(ML.save); ML.refreshHome(); ML.toast('Imported ' + n + ' new items'); render();
+        ['tags', 'entries', 'todos', 'habits', 'habitLog'].forEach(ML.save); ML.refreshHome(); ML.toast('Imported ' + n + ' new items'); render();
       } catch (e) { ML.toast('That file isn’t a Moodlog backup'); }
     });
   }

@@ -52,7 +52,7 @@
         const mins = ML.S.settings.lockAfter;
         if (!locked && hiddenAt && mins >= 0 && Date.now() - hiddenAt >= mins * 60000) {
           const cur = ML.currentScreen && ML.currentScreen() !== 'slock' ? ML.currentScreen() : 'smain';
-          const safe = ['svoice', 'scheckin'].includes(cur) ? 'smain' : cur;
+          const safe = ['svoice', 'scompose'].includes(cur) ? 'smain' : cur;
           ML.lock.show(safe);
         }
       });

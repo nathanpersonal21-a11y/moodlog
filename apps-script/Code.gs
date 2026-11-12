@@ -1,5 +1,5 @@
 /**
- * Moodlog backup + reminders — Google Apps Script  (version 2)
+ * Moodlog backup + reminders — Google Apps Script  (version 3)
  *
  * Paste this whole file into your Apps Script project (replace the old code), then:
  *   1. Run the function  authorize  once (▶ Run) and accept the permission prompts.
@@ -7,7 +7,7 @@
  *      (Keep: Execute as "Me", Who has access "Anyone".)  The web app URL stays the same.
  *
  * What it does
- *   • Saves every entry / check-in to the "Entries" sheet (adds or updates the row — never duplicates).
+ *   • Saves every journal entry (with its mood score) to the "Entries" sheet (adds or updates the row — never duplicates).
  *   • Marks deleted entries instead of removing their rows, so the sheet stays a full backup.
  *   • Saves photos and voice recordings to a "Moodlog" folder in your Google Drive.
  *   • Creates repeating Google Calendar events with a popup alert = your phone reminders.
@@ -19,11 +19,12 @@ const SECRET = '';
 // If the script is standalone, paste the Sheet's ID (the long text in its URL between /d/ and /edit).
 const SHEET_ID = '';
 
-const VERSION = '2';
+const VERSION = '3';
 const SHEET_NAME = 'Entries';
 const DRIVE_FOLDER = 'Moodlog';
 const HEADERS = ['_id', 'timestamp', 'type', 'moodScore', 'moodLabel', 'text', 'transcript', 'tags', 'latitude', 'longitude', 'accuracy', 'driveUrl', 'imageUrl', 'updatedAt', 'deleted'];
-const REMINDER_TITLE = 'Moodlog check-in';
+const REMINDER_TITLE = 'Moodlog journal';
+const OLD_TITLES = ['Moodlog check-in']; // reminders made by earlier versions get cleaned up too
 
 function authorize() {
   // Touching each service makes Google show the permission prompt once.
@@ -140,13 +141,13 @@ function removeReminderSeries_(cal) {
   const from = new Date(); from.setHours(0, 0, 0, 0);
   const to = new Date(from.getTime() + 8 * 86400000);
   const seen = {};
-  cal.getEvents(from, to, { search: REMINDER_TITLE }).forEach(ev => {
-    if (ev.getTitle() !== REMINDER_TITLE) return;
+  [REMINDER_TITLE].concat(OLD_TITLES).forEach(title => cal.getEvents(from, to, { search: title }).forEach(ev => {
+    if (ev.getTitle() !== title) return;
     try {
       const s = ev.getEventSeries(); const id = s.getId();
       if (seen[id]) return; seen[id] = 1; s.deleteEventSeries();
     } catch (err) { try { ev.deleteEvent(); } catch (e2) {} }
-  });
+  }));
 }
 
 function setReminders_(p) {
@@ -162,7 +163,7 @@ function setReminders_(p) {
     start = new Date(start.getFullYear(), start.getMonth(), start.getDate() + add, h, m, 0);
     if (start.getTime() < now.getTime()) start = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 7, h, m, 0);
     const end = new Date(start.getTime() + 10 * 60000);
-    const series = cal.createEventSeries(REMINDER_TITLE, start, end, CalendarApp.newRecurrence().addWeeklyRule().onlyOnWeekday(W[d.dow]), { description: 'How are you feeling? ' + (p.appUrl || '') });
+    const series = cal.createEventSeries(REMINDER_TITLE, start, end, CalendarApp.newRecurrence().addWeeklyRule().onlyOnWeekday(W[d.dow]), { description: 'Time to journal — how are you feeling? ' + (p.appUrl || '') });
     series.removeAllReminders(); series.addPopupReminder(0);
     made++;
   });

@@ -38,17 +38,17 @@
   function render() {
     const body = $('#trends-body'); if (!body) return;
     const now = new Date(), startK = ML.dayKey(ML.addDays(now, -(range - 1))), prevStartK = ML.dayKey(ML.addDays(now, -(range * 2 - 1)));
-    const pts = S.checkins.filter(c => ML.dayKey(c.ts) >= startK);
-    const prev = S.checkins.filter(c => { const k = ML.dayKey(c.ts); return k >= prevStartK && k < startK; });
+    const pts = S.entries.filter(c => ML.dayKey(c.ts) >= startK);
+    const prev = S.entries.filter(c => { const k = ML.dayKey(c.ts); return k >= prevStartK && k < startK; });
     let html = '<div class="seg" id="t-seg">' + RANGES.map(([d, l]) => '<button data-d="' + d + '" class="' + (d === range ? 'on' : '') + '">' + l + '</button>').join('') + '</div>';
     if (!pts.length) {
-      html += '<div class="empty-state"><div class="empty-icon">📈</div><p>No check-ins in this period yet. Check in a few times and your trends show up here.</p></div><button class="btn-primary" id="t-ci">Check in now</button>';
+      html += '<div class="empty-state"><div class="empty-icon">📈</div><p>No entries in this period yet. Add a few entries with your mood and your trends show up here.</p></div><button class="btn-primary" id="t-ci">Write an entry</button>';
       body.innerHTML = html; wire(body); return;
     }
     const all = pts.map(p => p.mood), mean = avg(all), pm = prev.length ? avg(prev.map(p => p.mood)) : null;
     const dm = daily(pts), keys = Object.keys(dm), dAvg = keys.map(k => ({ k, v: avg(dm[k]) }));
     const best = dAvg.reduce((a, b) => b.v > a.v ? b : a), low = dAvg.reduce((a, b) => b.v < a.v ? b : a);
-    let streak = 0; for (let i = 0; i < 400; i++) { const k = ML.dayKey(ML.addDays(now, -i)); if (dm[k] || S.checkins.some(c => ML.dayKey(c.ts) === k)) streak++; else if (i > 0) break; else continue; }
+    let streak = 0; for (let i = 0; i < 400; i++) { const k = ML.dayKey(ML.addDays(now, -i)); if (dm[k] || S.entries.some(c => ML.dayKey(c.ts) === k)) streak++; else if (i > 0) break; else continue; }
     const delta = pm == null ? null : mean - pm;
 
     // chart
@@ -58,7 +58,7 @@
     // stats
     html += '<div class="stat-grid">'
       + '<div class="stat"><div class="k">Average</div><div class="v" style="color:' + ML.moodColor(mean) + '">' + r1(mean) + '</div><div class="s ' + (delta == null ? '' : delta >= 0 ? 'up' : 'down') + '">' + (delta == null ? ML.moodWord(mean) : (delta >= 0 ? '▲ ' : '▼ ') + Math.abs(r1(delta)) + ' vs previous') + '</div></div>'
-      + '<div class="stat"><div class="k">Check-ins</div><div class="v">' + pts.length + '</div><div class="s">' + keys.length + ' of ' + range + ' days · ' + streak + ' day streak</div></div>'
+      + '<div class="stat"><div class="k">Entries</div><div class="v">' + pts.length + '</div><div class="s">' + keys.length + ' of ' + range + ' days · ' + streak + ' day streak</div></div>'
       + '<div class="stat"><div class="k">Best day</div><div class="v" style="color:' + ML.moodColor(best.v) + '">' + r1(best.v) + '</div><div class="s">' + ML.fmtShort(ML.parseDay(best.k)) + '</div></div>'
       + '<div class="stat"><div class="k">Lowest day</div><div class="v" style="color:' + ML.moodColor(low.v) + '">' + r1(low.v) + '</div><div class="s">' + ML.fmtShort(ML.parseDay(low.k)) + '</div></div></div>';
 
@@ -89,10 +89,10 @@
     if (rows.length) {
       rows.sort((a, b) => b.d - a.d); const mx = Math.max(10, ...rows.map(r => Math.abs(r.d)));
       html += '<div class="card"><div class="chart-title">What shifts your mood</div><div class="bars">' + rows.slice(0, 8).map(r => '<div class="bar-row"><div class="lbl">' + esc((r.t.emoji ? r.t.emoji + ' ' : '') + r.t.name) + '</div><div class="delta-track"><i style="' + (r.d >= 0 ? 'left:50%;width:' + (r.d / mx * 50) + '%;background:var(--success)' : 'right:50%;width:' + (-r.d / mx * 50) + '%;background:var(--danger)') + '"></i></div><div class="val ' + (r.d >= 0 ? 'up' : 'down') + '">' + (r.d >= 0 ? '+' : '') + r1(r.d) + '</div></div>').join('') + '</div><div class="hint" style="margin-top:.6rem">Average mood at check-ins tagged with each activity, compared to your overall average. Needs 2+ tagged check-ins.</div></div>';
-    } else if (S.tags.length === 0) html += '<div class="card"><div class="chart-title">What shifts your mood</div><div class="insight">Add tags like Exercise or Friends when you check in, and Moodlog will show which activities lift or lower your mood.</div></div>';
+    } else if (S.tags.length === 0) html += '<div class="card"><div class="chart-title">What shifts your mood</div><div class="insight">Add tags like Exercise or Friends when you write an entry, and Moodlog will show which activities lift or lower your mood.</div></div>';
 
     // top feelings
-    const lab = {}; pts.forEach(p => { const l = (p.label || '').trim(); if (l) { const k = l.toLowerCase(); lab[k] = (lab[k] || 0) + 1; } });
+    const lab = {}; pts.forEach(p => { const l = (p.moodLabel || '').trim(); if (l) { const k = l.toLowerCase(); lab[k] = (lab[k] || 0) + 1; } });
     const top = Object.entries(lab).sort((a, b) => b[1] - a[1]).slice(0, 8);
     if (top.length) html += '<div class="card"><div class="chart-title">Most common feelings</div><div class="chips">' + top.map(([l, n]) => '<span class="chip static">' + esc(l) + ' · ' + n + '</span>').join('') + '</div></div>';
 
@@ -114,7 +114,7 @@
         const rc = svg.getBoundingClientRect(), x = (e.clientX - rc.left) * (340 / rc.width);
         let b = null, bd = 1e9; lc.series.forEach(s => { const dd = Math.abs(lc.X(s.t) - x); if (dd < bd) { bd = dd; b = s; } });
         if (!b) return; const hi = $('#trend-hi', svg); hi.setAttribute('cx', lc.X(b.t)); hi.setAttribute('cy', lc.Y(b.v)); hi.style.display = '';
-        const w = $('#t-read', body); w.innerHTML = esc(b.label) + ' · <b style="color:' + ML.moodColor(b.v) + '">' + r1(b.v) + '</b> · ' + ML.moodWord(b.v) + ' · ' + b.n + ' check-in' + (b.n > 1 ? 's' : '');
+        const w = $('#t-read', body); w.innerHTML = esc(b.label) + ' · <b style="color:' + ML.moodColor(b.v) + '">' + r1(b.v) + '</b> · ' + ML.moodWord(b.v) + ' · ' + b.n + ' entr' + (b.n > 1 ? 'ies' : 'y') + (false ? 's' : '');
       };
       svg.addEventListener('pointerdown', show); svg.addEventListener('pointermove', e => { if (e.buttons || e.pointerType === 'mouse') show(e); });
     }
@@ -122,7 +122,7 @@
 
   function wire(body) {
     body.querySelectorAll('#t-seg button').forEach(b => b.onclick = () => { range = +b.dataset.d; render(); });
-    const ci = $('#t-ci', body); if (ci) ci.onclick = () => ML.openCheckin({ returnTo: 'smain' });
+    const ci = $('#t-ci', body); if (ci) ci.onclick = () => ML.openCompose();
   }
   ML.renderTrends = render;
 })();

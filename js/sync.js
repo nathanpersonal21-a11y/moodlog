@@ -28,8 +28,8 @@
   const payload = (kind, r) => {
     const names = (r.tags || []).map(ML.data.tagName).filter(Boolean).join(', ');
     return {
-      _id: r.id, kind, type: kind === 'checkin' ? 'checkin' : r.type, moodScore: r.mood, moodLabel: kind === 'checkin' ? r.label || '' : r.moodLabel || '',
-      text: kind === 'checkin' ? r.note || '' : r.text || '', transcript: r.transcript || '', tags: names,
+      _id: r.id, kind, type: r.type, moodScore: r.mood, moodLabel: r.moodLabel || '',
+      text: r.text || '', transcript: r.transcript || '', tags: names,
       timestamp: new Date(r.ts).toISOString(), updatedAt: new Date(r.updatedAt || r.ts).toISOString(),
       latitude: r.loc ? r.loc.lat : '', longitude: r.loc ? r.loc.lon : '', accuracy: r.loc ? r.loc.acc : '',
       driveUrl: r.driveUrl || '', imageUrl: r.imageUrl || '', deleted: false
@@ -42,10 +42,10 @@
       const j = await post({ action: 'deleteEntry', _id: q.id });
       return j && j.success ? 'ok' : (/unknown/i.test((j && j.error) || '') ? 'drop' : 'retry');
     }
-    const list = q.kind === 'checkin' ? S.checkins : S.entries, r = list.find(x => x.id === q.id);
+    const r = S.entries.find(x => x.id === q.id);
     if (!r) return 'drop';
     let missing = false;
-    if (q.kind === 'entry') {
+    {
       if (r.photoId && !r.imageUrl) { const b = await ML.blob.get(r.photoId); if (b) { const u = await upload(b, 'moodlog-photo-' + r.id + '.jpg'); if (u) { r.imageUrl = u; ML.save('entries'); } else missing = true; } }
       if (r.audioId && !r.driveUrl) { const b = await ML.blob.get(r.audioId); if (b) { const ext = (b.type || '').includes('mp4') ? 'm4a' : 'webm'; const u = await upload(b, 'moodlog-' + r.id + '.' + ext); if (u) { r.driveUrl = u; ML.save('entries'); } else missing = true; } }
     }
@@ -55,7 +55,7 @@
       j = await post(Object.assign({ action: 'addEntry' }, payload(q.kind, r)));
     }
     if (!(j && j.success)) return 'retry';
-    r.synced = !missing; if (q.kind === 'entry') ML.save('entries'); else ML.save('checkins');
+    r.synced = !missing; ML.save('entries');
     return missing ? 'retry' : 'ok';
   }
 
@@ -73,7 +73,6 @@
   // queue everything not yet backed up (used after setting the script URL for the first time)
   ML.sync.queueAll = () => {
     S.entries.forEach(e => { if (!S.queue.some(q => q.kind === 'entry' && q.id === e.id)) S.queue.push({ op: 'upsert', kind: 'entry', id: e.id }); });
-    S.checkins.forEach(c => { if (!c.legacy && !S.queue.some(q => q.kind === 'checkin' && q.id === c.id)) S.queue.push({ op: 'upsert', kind: 'checkin', id: c.id }); });
     ML.save('queue');
   };
 

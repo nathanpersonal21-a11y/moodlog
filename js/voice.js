@@ -20,7 +20,7 @@
     $('#vorb').classList.remove('rec'); $('#vring').style.transform = 'scale(1)';
     $('#vmeter-wrap').classList.add('hidden'); $('#vlive').classList.add('hidden'); $('#vlive-txt').textContent = 'Listening…';
     $('#vreview').classList.add('hidden'); $('#vcloud').textContent = ''; $('#vss').textContent = ''; $('#vss').className = 'save-status';
-    $('#vsave').disabled = false; $('#v-audio').removeAttribute('src');
+    $('#vsave').disabled = false; $('#v-audio').removeAttribute('src'); picker = null; $('#v-mood-picker').innerHTML = '';
     $('#vloc-status').classList.remove('has'); $('#vloc-txt').textContent = 'No location'; $('#bvgetloc').textContent = 'Add';
   }
 
@@ -87,7 +87,7 @@
     $('#vreview').classList.remove('hidden'); $('#v-text').value = live;
     if (blob) $('#v-audio').src = URL.createObjectURL(blob);
     ML.tagPicker($('#v-tags'), vTags);
-    const last = ML.data.latestCheckin(); $('#v-mood').textContent = last ? 'Mood ' + last.mood + (last.label ? ' · ' + last.label : '') : 'No mood check-in yet';
+    picker = ML.moodPicker($('#v-mood-picker'), { mood: ML.defaultMood(), size: 200 });
     if (canCloud()) improve(true);
   }
 
@@ -112,12 +112,13 @@
     } catch (e) { el.textContent = 'Cloud transcription failed (' + e.message + ') — kept the original'; }
   }
 
+  let picker = null;
   async function save() {
     if (saving) return; saving = true; const btn = $('#vsave'); btn.disabled = true;
     try {
-      const id = ML.uid(), last = ML.data.latestCheckin(); let audioId = null;
+      const id = ML.uid(), m = picker ? picker.get() : { mood: 50, label: '' }; let audioId = null;
       if (blob) { audioId = 'audio:' + id; await ML.blob.put(audioId, blob); }
-      ML.data.addEntry({ id, ts: Date.now(), updatedAt: Date.now(), type: 'voice', mood: last ? last.mood : 50, moodLabel: last ? last.label || '' : '', text: '', transcript: $('#v-text').value.trim(), tags: [...vTags], loc: vLoc, photoId: null, audioId, imageUrl: null, driveUrl: null, synced: false, checkinId: last ? last.id : null });
+      ML.data.addEntry({ id, ts: Date.now(), updatedAt: Date.now(), type: 'voice', mood: m.mood, moodLabel: m.label, text: '', transcript: $('#v-text').value.trim(), tags: [...vTags], loc: vLoc, photoId: null, audioId, imageUrl: null, driveUrl: null, synced: false });
       ML.refreshHome(); ML.toast('Voice entry saved'); reset(); ML.ss('smain');
     } finally { saving = false; btn.disabled = false; }
   }

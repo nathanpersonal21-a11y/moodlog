@@ -4,7 +4,7 @@ const CACHE_VERSION = 'moodlog-v20261111-0211';
 
 const STATIC_ASSETS = [
   './', './index.html', './manifest.webmanifest', './css/app.css',
-  './js/util.js', './js/store.js', './js/theme.js', './js/ui.js', './js/lock.js', './js/dial.js', './js/checkin.js',
+  './js/util.js', './js/store.js', './js/theme.js', './js/ui.js', './js/lock.js', './js/dial.js', './js/celebrate.js', './js/todo.js',
   './js/journal.js', './js/voice.js', './js/habits.js', './js/trends.js', './js/sync.js', './js/reminders.js',
   './js/settings.js', './js/app.js',
   './icons/icon-180.png', './icons/icon-192.png', './icons/icon-512.png', './icons/icon-maskable-512.png'

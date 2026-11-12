@@ -1,6 +1,6 @@
 # Moodlog
 
-A private mood journal that lives on your phone. Mood check-ins with a tactile dial, written and voice entries,
+A private mood journal that lives on your phone. Every entry carries your mood (tactile dial), written or voice, plus a per-day to-do list with confetti,
 tags, search and filters, habits, trends, themes, phone reminders, and an automatic backup to your own Google Sheet.
 
 No accounts, no servers, no cost. Everything is stored on your device; the Google backup is optional and goes to *your* Google account.
