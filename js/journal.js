@@ -147,12 +147,13 @@
   }
   let picker = null;
 
-  async function openCompose(id) {
+  async function openCompose(id, pre) {
+    if (!id && !pre) { ML.askMood(m => openCompose(null, m)); return; }
     cId = id || null; const rec = id ? S.entries.find(e => e.id === id) : null;
     cTags = new Set(rec ? rec.tags || [] : []); cLoc = rec ? rec.loc || null : null; cPhotoBlob = null; cPhotoRemoved = false;
     cHasPhoto = !!(rec && rec.photoId); cPhotoUrl = rec && rec.photoId ? await ML.blob.url(rec.photoId) : null;
     $('#compose-title').textContent = rec ? 'Edit entry' : 'New entry';
-    picker = ML.moodChip($('#c-mood-picker'), rec ? { mood: rec.mood, label: rec.moodLabel } : ML.currentMood());
+    picker = ML.moodChip($('#c-mood-picker'), rec ? { mood: rec.mood, label: rec.moodLabel } : pre);
     $('#jtxt').value = rec ? (rec.type === 'voice' ? rec.transcript || '' : rec.text || '') : '';
     ML.tagPicker($('#c-tags'), cTags);
     const has = !!cLoc; $('#loc-status').classList.toggle('has', has);
@@ -182,7 +183,6 @@
         const nid = ML.uid(); let photoId = null;
         if (pb) { photoId = 'photo:' + nid; await ML.blob.put(photoId, pb); }
         ML.data.addEntry({ id: nid, ts: Date.now(), updatedAt: Date.now(), type: 'text', mood: m.mood, moodLabel: m.label, text, transcript: '', tags, loc, photoId, audioId: null, imageUrl: null, driveUrl: null, synced: false });
-        ML.setCurrentMood(m.mood, m.label);
       }
       ML.refreshHome();
     } finally { saving = false; }

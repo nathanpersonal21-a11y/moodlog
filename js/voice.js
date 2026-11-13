@@ -5,7 +5,7 @@
   const ML = window.ML, $ = ML.$, S = ML.S;
   let recording = false, mr = null, chunks = [], stream = null, blob = null, stoppedP = null, recog = null;
   let timer = null, secs = 0, live = '', level = { ctx: null, raf: 0 }, wake = null;
-  let vTags = new Set(), vLoc = null, saving = false;
+  let vTags = new Set(), vLoc = null, saving = false, vMood = { mood: 50, label: '' };
 
   const fmt = s => Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
   const mimeType = () => {
@@ -88,7 +88,7 @@
     $('#vreview').classList.remove('hidden'); $('#v-text').value = live;
     if (blob) $('#v-audio').src = URL.createObjectURL(blob);
     ML.tagPicker($('#v-tags'), vTags);
-    picker = ML.moodChip($('#v-mood-picker'), ML.currentMood());
+    picker = ML.moodChip($('#v-mood-picker'), vMood);
     if (canCloud()) improve(true);
   }
 
@@ -116,18 +116,18 @@
   let picker = null;
   async function save() {
     if (saving) return; saving = true;
-    const id = ML.uid(), m = picker ? picker.get() : ML.currentMood(), b = blob, tags = [...vTags], loc = vLoc, tr = $('#v-text').value.trim(), ts = Date.now();
+    const id = ML.uid(), m = picker ? picker.get() : vMood, b = blob, tags = [...vTags], loc = vLoc, tr = $('#v-text').value.trim(), ts = Date.now();
     ML.haptic('bump'); ML.toast('Voice entry saved'); ML.ss('smain'); reset(); // leave right away; the recording is stored just behind it
     try {
       let audioId = null;
       if (b) { audioId = 'audio:' + id; await ML.blob.put(audioId, b); }
       ML.data.addEntry({ id, ts, updatedAt: ts, type: 'voice', mood: m.mood, moodLabel: m.label, text: '', transcript: tr, tags, loc, photoId: null, audioId, imageUrl: null, driveUrl: null, synced: false });
-      ML.setCurrentMood(m.mood, m.label); ML.refreshHome();
+      ML.refreshHome();
     } finally { saving = false; }
   }
 
   ML.initVoice = () => {
-    $('#bvoiceentry').onclick = () => { reset(); ML.ss('svoice'); };
+    $('#bvoiceentry').onclick = () => ML.askMood(m => { reset(); vMood = m; ML.ss('svoice'); });
     $('#bvoiceback').onclick = async () => {
       if (recording) { if (!(await ML.confirm('Discard recording?', 'You are still recording.', 'Discard', true))) return; recording = false; try { mr.stop(); } catch (e) {} clearInterval(timer); stopMeter(); if (recog) { try { recog.stop(); } catch (e) {} recog = null; } try { stream.getTracks().forEach(t => t.stop()); } catch (e) {} }
       reset(); ML.ss('smain');
