@@ -63,7 +63,7 @@
 
   function renderPrompt() {
     const box = $('#ci-prompt'), last = ML.data.latestEntry();
-    const stale = !last || Date.now() - last.ts > S.settings.checkinGapHours * 3600000;
+    const stale = !last || Date.now() - last.ts > (S.settings.checkinGapHours || 4) * 3600000;
     box.classList.toggle('hidden', isFiltered() || !stale);
     if (stale) $('#ci-prompt-sub').textContent = last ? 'Last entry ' + ML.fmtShort(last.ts) + ' · ' + ML.fmtTime(last.ts) : 'Set your mood and add a few words';
   }
@@ -152,7 +152,7 @@
     cTags = new Set(rec ? rec.tags || [] : []); cLoc = rec ? rec.loc || null : null; cPhotoBlob = null; cPhotoRemoved = false;
     cHasPhoto = !!(rec && rec.photoId); cPhotoUrl = rec && rec.photoId ? await ML.blob.url(rec.photoId) : null;
     $('#compose-title').textContent = rec ? 'Edit entry' : 'New entry';
-    picker = ML.moodPicker($('#c-mood-picker'), { mood: rec ? rec.mood : ML.defaultMood(), label: rec ? rec.moodLabel : '' });
+    picker = ML.moodChip($('#c-mood-picker'), rec ? { mood: rec.mood, label: rec.moodLabel } : ML.currentMood());
     $('#jtxt').value = rec ? (rec.type === 'voice' ? rec.transcript || '' : rec.text || '') : '';
     ML.tagPicker($('#c-tags'), cTags);
     const has = !!cLoc; $('#loc-status').classList.toggle('has', has);
@@ -166,24 +166,28 @@
   async function saveCompose() {
     const text = $('#jtxt').value.trim();
     const isVoice = !!(cId && (S.entries.find(e => e.id === cId) || {}).type === 'voice');
-    const btn = $('#bsavetxt'); btn.disabled = true;
+    if (saving) return; saving = true;
+    // grab everything first, then leave the screen at once so saving feels instant; the work finishes right behind it
+    const m = picker.get(), id = cId, tags = [...cTags], loc = cLoc, pb = cPhotoBlob, removed = cPhotoRemoved;
+    ML.haptic('bump'); ML.ss('smain'); ML.toast(id ? 'Entry updated' : 'Entry saved');
     try {
-      const m = picker.get();
-      if (cId) {
-        const rec = S.entries.find(e => e.id === cId); let photoId = rec.photoId;
-        if (cPhotoBlob) { photoId = 'photo:' + cId; ML.blob.invalidate(photoId); await ML.blob.put(photoId, cPhotoBlob); }
-        else if (cPhotoRemoved && photoId) { await ML.blob.del(photoId); photoId = null; }
-        const patch = { tags: [...cTags], loc: cLoc, photoId, mood: m.mood, moodLabel: m.label }; if (rec.type === 'voice') patch.transcript = text; else patch.text = text;
-        if (photoId !== rec.photoId || cPhotoBlob) patch.imageUrl = null;
-        ML.data.updateEntry(cId, patch);
+      if (id) {
+        const rec = S.entries.find(e => e.id === id); let photoId = rec.photoId;
+        if (pb) { photoId = 'photo:' + id; ML.blob.invalidate(photoId); await ML.blob.put(photoId, pb); }
+        else if (removed && photoId) { ML.blob.del(photoId); photoId = null; }
+        const patch = { tags, loc, photoId, mood: m.mood, moodLabel: m.label }; if (rec.type === 'voice') patch.transcript = text; else patch.text = text;
+        if (photoId !== rec.photoId || pb) patch.imageUrl = null;
+        ML.data.updateEntry(id, patch);
       } else {
-        const id = ML.uid(); let photoId = null;
-        if (cPhotoBlob) { photoId = 'photo:' + id; await ML.blob.put(photoId, cPhotoBlob); }
-        ML.data.addEntry({ id, ts: Date.now(), updatedAt: Date.now(), type: 'text', mood: m.mood, moodLabel: m.label, text, transcript: '', tags: [...cTags], loc: cLoc, photoId, audioId: null, imageUrl: null, driveUrl: null, synced: false });
+        const nid = ML.uid(); let photoId = null;
+        if (pb) { photoId = 'photo:' + nid; await ML.blob.put(photoId, pb); }
+        ML.data.addEntry({ id: nid, ts: Date.now(), updatedAt: Date.now(), type: 'text', mood: m.mood, moodLabel: m.label, text, transcript: '', tags, loc, photoId, audioId: null, imageUrl: null, driveUrl: null, synced: false });
+        ML.setCurrentMood(m.mood, m.label);
       }
-      ML.refreshHome(); ML.toast(cId ? 'Entry updated' : 'Entry saved'); ML.ss('smain');
-    } finally { btn.disabled = false; }
+      ML.refreshHome();
+    } finally { saving = false; }
   }
+  let saving = false;
 
   // ── view ──
   let viewId = null;

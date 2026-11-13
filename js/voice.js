@@ -46,8 +46,8 @@
 
   async function start() {
     $('#vstate').textContent = 'starting…';
-    try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 } }); }
-    catch (e) { try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch (e2) { ML.toast('Microphone access denied'); $('#vstate').textContent = 'tap to record'; return; } }
+    try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+    catch (e) { ML.toast('Microphone access denied'); $('#vstate').textContent = 'tap to record'; return; }
     chunks = []; live = ''; blob = null;
     const mt = mimeType();
     try { mr = mt ? new MediaRecorder(stream, { mimeType: mt }) : new MediaRecorder(stream); }
@@ -60,7 +60,7 @@
     try { mr.start(1000); } catch (e) { stream.getTracks().forEach(t => t.stop()); ML.toast('Could not start recording'); return; }
     recording = true; $('#vorb').classList.add('rec'); $('#vstate').textContent = 'recording — tap to stop'; $('#vlive').classList.remove('hidden');
     secs = 0; clearInterval(timer); timer = setInterval(() => { secs++; $('#vtimer').textContent = fmt(secs); }, 1000);
-    meter(stream);
+    $('#vring').style.transform = 'scale(1.12)';
     try { if (navigator.wakeLock) navigator.wakeLock.request('screen').then(w => { wake = w; }).catch(() => {}); } catch (e) {}
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (SR) {
@@ -69,7 +69,7 @@
       recog.onresult = e => {
         let interim = '';
         for (let i = e.resultIndex; i < e.results.length; i++) { const t = e.results[i][0].transcript; if (e.results[i].isFinal) full += t + ' '; else interim += t; }
-        live = full.trim(); const el = $('#vlive-txt'); el.textContent = (full + interim) || 'Listening…';
+        live = (full + interim).trim(); const el = $('#vlive-txt'); el.textContent = (full + interim) || 'Listening…';
       };
       recog.onerror = () => {}; recog.onend = () => { if (recording) try { recog.start(); } catch (e) {} };
       try { recog.start(); } catch (e) {}
@@ -79,15 +79,16 @@
   async function stop() {
     if (!recording) return; recording = false; clearInterval(timer); stopMeter();
     try { wake && wake.release(); } catch (e) {} wake = null;
-    if (recog) { try { recog.stop(); } catch (e) {} recog = null; }
+    const r0 = recog; if (r0) { try { r0.stop(); } catch (e) {} }
     if (mr && mr.state !== 'inactive') { try { mr.stop(); } catch (e) {} }
     $('#vorb').classList.remove('rec'); $('#vring').style.transform = 'scale(1)'; $('#vstate').textContent = 'processing…';
     try { await stoppedP; } catch (e) {}
+    await new Promise(r => setTimeout(r, 450)); recog = null; // let the last recognised words arrive
     $('#vlive').classList.add('hidden'); $('#vstate').textContent = 'recorded';
     $('#vreview').classList.remove('hidden'); $('#v-text').value = live;
     if (blob) $('#v-audio').src = URL.createObjectURL(blob);
     ML.tagPicker($('#v-tags'), vTags);
-    picker = ML.moodPicker($('#v-mood-picker'), { mood: ML.defaultMood(), size: 200 });
+    picker = ML.moodChip($('#v-mood-picker'), ML.currentMood());
     if (canCloud()) improve(true);
   }
 
@@ -114,13 +115,15 @@
 
   let picker = null;
   async function save() {
-    if (saving) return; saving = true; const btn = $('#vsave'); btn.disabled = true;
+    if (saving) return; saving = true;
+    const id = ML.uid(), m = picker ? picker.get() : ML.currentMood(), b = blob, tags = [...vTags], loc = vLoc, tr = $('#v-text').value.trim(), ts = Date.now();
+    ML.haptic('bump'); ML.toast('Voice entry saved'); ML.ss('smain'); reset(); // leave right away; the recording is stored just behind it
     try {
-      const id = ML.uid(), m = picker ? picker.get() : { mood: 50, label: '' }; let audioId = null;
-      if (blob) { audioId = 'audio:' + id; await ML.blob.put(audioId, blob); }
-      ML.data.addEntry({ id, ts: Date.now(), updatedAt: Date.now(), type: 'voice', mood: m.mood, moodLabel: m.label, text: '', transcript: $('#v-text').value.trim(), tags: [...vTags], loc: vLoc, photoId: null, audioId, imageUrl: null, driveUrl: null, synced: false });
-      ML.refreshHome(); ML.toast('Voice entry saved'); reset(); ML.ss('smain');
-    } finally { saving = false; btn.disabled = false; }
+      let audioId = null;
+      if (b) { audioId = 'audio:' + id; await ML.blob.put(audioId, b); }
+      ML.data.addEntry({ id, ts, updatedAt: ts, type: 'voice', mood: m.mood, moodLabel: m.label, text: '', transcript: tr, tags, loc, photoId: null, audioId, imageUrl: null, driveUrl: null, synced: false });
+      ML.setCurrentMood(m.mood, m.label); ML.refreshHome();
+    } finally { saving = false; }
   }
 
   ML.initVoice = () => {

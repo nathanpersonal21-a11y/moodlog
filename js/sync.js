@@ -11,9 +11,9 @@
   }
   ML.sync = { post };
 
-  ML.sync.enqueue = (op, kind, id) => {
+  ML.sync.enqueue = (op, kind, id, ts) => {
     S.queue = S.queue.filter(q => !(q.kind === kind && q.id === id));
-    S.queue.push({ op, kind, id }); ML.save('queue'); ML.sync.kick();
+    S.queue.push(ts ? { op, kind, id, ts } : { op, kind, id }); ML.save('queue'); ML.sync.kick();
   };
   ML.sync.kick = () => { if (url() && navigator.onLine) setTimeout(ML.sync.flush, 400); };
   ML.sync.pending = () => S.queue.length;
@@ -39,7 +39,7 @@
   async function one(q) {
     if (q.op === 'delete') {
       if (legacy) return 'drop';
-      const j = await post({ action: 'deleteEntry', _id: q.id });
+      const j = await post({ action: 'deleteEntry', _id: q.id, timestamp: new Date(q.ts || +q.id || 0).toISOString() });
       return j && j.success ? 'ok' : (/unknown/i.test((j && j.error) || '') ? 'drop' : 'retry');
     }
     const r = S.entries.find(x => x.id === q.id);

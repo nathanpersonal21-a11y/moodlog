@@ -103,9 +103,25 @@
     };
   };
 
-  // sensible starting mood for a new entry: today's latest mood, otherwise neutral
-  ML.defaultMood = () => {
-    const l = ML.data.latestEntry();
-    return l && ML.dayKey(l.ts) === ML.todayKey() ? l.mood : 50;
+  // the mood you set most recently (today) — new entries start from it
+  ML.currentMood = () => {
+    const c = ML.S.settings.curMood;
+    return c && ML.dayKey(c.ts) === ML.todayKey() ? { mood: c.mood, label: c.label || '' } : { mood: 50, label: '' };
+  };
+  ML.defaultMood = () => ML.currentMood().mood;
+  ML.setCurrentMood = (mood, label) => { ML.S.settings.curMood = { ts: Date.now(), mood, label: label || '' }; ML.save('settings'); };
+
+  // compact mood row for entry screens (no scrolling): tap to open the dial in a sheet
+  ML.moodChip = function (container, init) {
+    let st = { mood: init.mood || 50, label: init.label || '' };
+    const paint = () => {
+      container.innerHTML = '<button type="button" class="card mood-chip"><b style="color:' + ML.moodColor(st.mood) + '">' + st.mood + '</b><span class="grow" style="text-align:left"><span style="display:block;font-size:15px">' + ML.esc(st.label || ML.moodWord(st.mood)) + '</span><span class="hint">Tap to change mood</span></span><span class="muted">›</span></button>';
+      container.firstElementChild.onclick = () => ML.sheet('How are you feeling?', '<div id="sp-mp"></div><button class="btn-primary" id="sp-ok">Done</button>', (el, close) => {
+        const pk = ML.moodPicker(el.querySelector('#sp-mp'), { mood: st.mood, label: st.label, size: 210 });
+        el.querySelector('#sp-ok').onclick = () => { st = pk.get(); close(); paint(); };
+      });
+    };
+    paint();
+    return { get: () => ({ mood: st.mood, label: st.label }), set(m, l) { st = { mood: m, label: l || '' }; paint(); } };
   };
 })();

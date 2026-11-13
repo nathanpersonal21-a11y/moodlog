@@ -54,7 +54,7 @@
 
   // ── records ──
   const kick = () => { ML.sync && ML.sync.kick && ML.sync.kick(); };
-  const enqueue = (op, kind, id) => { ML.sync && ML.sync.enqueue(op, kind, id); };
+  const enqueue = (op, kind, id, ts) => { ML.sync && ML.sync.enqueue(op, kind, id, ts); };
 
   ML.data = {
     addEntry(e) { S.entries.push(e); ML.save('entries'); enqueue('upsert', 'entry', e.id); return e; },
@@ -67,7 +67,7 @@
       S.entries = S.entries.filter(x => x.id !== id); ML.save('entries');
       if (e.photoId) await ML.blob.del(e.photoId);
       if (e.audioId) await ML.blob.del(e.audioId);
-      enqueue('delete', 'entry', id);
+      enqueue('delete', 'entry', id, e.ts);
     },
     latestEntry() { return S.entries.reduce((a, c) => (!a || c.ts > a.ts ? c : a), null); },
 

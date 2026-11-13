@@ -1,40 +1,44 @@
 /**
- * Moodlog backup + reminders — Google Apps Script  (version 3)
+ * Moodlog backup + reminders — Google Apps Script  (version 4)
+ *
+ * Uses YOUR ORIGINAL sheet layout — no new columns are ever created:
+ *   A Timestamp (ISO) | B Timestamp (Readable) | C Mood Score | D Mood Label | E Entry Type | F Written Text
+ *   G Voice Transcript | H Latitude | I Longitude | J GPS Accuracy (m) | K Audio Drive URL | L Image
+ * (F and G show the first 5 words; the full text is in the cell note — hover / tap the cell. Tags are in F's note too.)
  *
  * Paste this whole file into your Apps Script project (replace the old code), then:
- *   1. Run the function  authorize  once (▶ Run) and accept the permission prompts.
- *   2. Deploy → Manage deployments → ✏️ Edit → Version: New version → Deploy.
- *      (Keep: Execute as "Me", Who has access "Anyone".)  The web app URL stays the same.
+ *   1. Run  authorize  once (▶ Run) and accept the permission prompts.
+ *   2. Optional, once: Run  repairSheet  to move rows written by the earlier version into the layout above
+ *      (make a copy of the Sheet first: File → Make a copy).
+ *   3. Deploy → Manage deployments → ✏️ Edit → Version: New version → Deploy. The web app URL stays the same.
  *
- * What it does
- *   • Saves every journal entry (with its mood score) to the "Entries" sheet (adds or updates the row — never duplicates).
- *   • Marks deleted entries instead of removing their rows, so the sheet stays a full backup.
- *   • Saves photos and voice recordings to a "Moodlog" folder in your Google Drive.
- *   • Creates repeating Google Calendar events with a popup alert = your phone reminders.
+ * Edited entries update their own row (matched by the ISO timestamp in column A). Deleted entries are greyed out and
+ * struck through, not removed. Photos and voice recordings go to the "Moodlog Audio" folder in Google Drive.
+ * Reminders are repeating Google Calendar events with a popup alert.
  */
 
 // OPTIONAL: if you set a secret here, enter the same text in Moodlog → Settings → Secret.
 const SECRET = '';
 // OPTIONAL: leave empty when this script was created from inside your Google Sheet (Extensions → Apps Script).
-// If the script is standalone, paste the Sheet's ID (the long text in its URL between /d/ and /edit).
 const SHEET_ID = '';
 
-const VERSION = '3';
+const VERSION = '4';
 const SHEET_NAME = 'Entries';
-const DRIVE_FOLDER = 'Moodlog';
-const HEADERS = ['_id', 'timestamp', 'type', 'moodScore', 'moodLabel', 'text', 'transcript', 'tags', 'latitude', 'longitude', 'accuracy', 'driveUrl', 'imageUrl', 'updatedAt', 'deleted'];
+const DRIVE_FOLDER_NAME = 'Moodlog Audio';
+const HEADERS = ['Timestamp (ISO)', 'Timestamp (Readable)', 'Mood Score', 'Mood Label', 'Entry Type', 'Written Text', 'Voice Transcript', 'Latitude', 'Longitude', 'GPS Accuracy (m)', 'Audio Drive URL', 'Image'];
+const NCOL = HEADERS.length;
 const REMINDER_TITLE = 'Moodlog journal';
 const OLD_TITLES = ['Moodlog check-in']; // reminders made by earlier versions get cleaned up too
 
 function authorize() {
-  // Touching each service makes Google show the permission prompt once.
-  if (SHEET_ID) SpreadsheetApp.openById(SHEET_ID); else SpreadsheetApp.getActiveSpreadsheet();
+  getSheet_();
   DriveApp.getRootFolder();
   CalendarApp.getDefaultCalendar();
   Logger.log('Authorized. Now deploy a new version.');
 }
+function setup() { getSheet_(); getFolder_(); Logger.log('Setup complete.'); }
 
-function doGet() { return json_({ success: true, version: VERSION, message: 'Moodlog script is running' }); }
+function doGet() { return json_({ success: true, status: 'ok', version: VERSION, message: 'Moodlog API running' }); }
 
 function doPost(e) {
   let p;
@@ -48,7 +52,8 @@ function doPost(e) {
       case 'addEntry':
       case 'upsertEntry': return json_(upsert_(p));
       case 'deleteEntry': return json_(markDeleted_(p));
-      case 'uploadAudio': return json_(upload_(p));
+      case 'uploadAudio':
+      case 'uploadImage': return json_(upload_(p));
       case 'setReminders': return json_(setReminders_(p));
       case 'testReminder': return json_(testReminder_(p));
       default: return json_({ success: false, error: 'Unknown action: ' + p.action });
@@ -62,78 +67,124 @@ function doPost(e) {
 
 function json_(o) { return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON); }
 
-// ───────────────────────── sheet ─────────────────────────
-function sheet_() {
+// ───────────────────────── sheet (original layout) ─────────────────────────
+function getSheet_() {
   const ss = SHEET_ID ? SpreadsheetApp.openById(SHEET_ID) : SpreadsheetApp.getActiveSpreadsheet();
   if (!ss) throw new Error('No spreadsheet: create this script from inside your Sheet, or set SHEET_ID at the top.');
-  return ss.getSheetByName(SHEET_NAME) || ss.getSheets()[0];
-}
-// header names are compared ignoring case, spaces and underscores, so "Mood Score" and "moodScore" are the same column
-const norm_ = s => String(s).toLowerCase().replace(/[^a-z0-9]/g, '');
-
-// returns {sheet, cols: {normalizedHeader: columnNumber}}; adds any missing columns at the end (existing columns are left alone)
-function prepare_() {
-  const sh = sheet_();
-  if (sh.getLastRow() === 0) sh.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS]).setFontWeight('bold');
-  let width = Math.max(sh.getLastColumn(), 1);
-  let head = sh.getRange(1, 1, 1, width).getValues()[0];
-  const cols = {};
-  head.forEach((h, i) => { if (h !== '') cols[norm_(h)] = i + 1; });
-  HEADERS.forEach(h => {
-    if (!cols[norm_(h)]) { width++; sh.getRange(1, width).setValue(h).setFontWeight('bold'); cols[norm_(h)] = width; }
-  });
-  return { sh, cols };
+  let sh = ss.getSheetByName(SHEET_NAME);
+  if (!sh) {
+    sh = ss.insertSheet(SHEET_NAME);
+    sh.appendRow(HEADERS);
+    sh.getRange(1, 1, 1, NCOL).setFontWeight('bold').setBackground('#1a1a2e').setFontColor('#c8a96e');
+    sh.setFrozenRows(1);
+    [200, 180, 100, 120, 90, 160, 160, 100, 100, 120, 160, 120].forEach((w, i) => sh.setColumnWidth(i + 1, w));
+  } else if (sh.getLastRow() === 0) {
+    sh.appendRow(HEADERS);
+    sh.getRange(1, 1, 1, NCOL).setFontWeight('bold').setBackground('#1a1a2e').setFontColor('#c8a96e');
+  }
+  return sh;
 }
 
-function findRow_(sh, idCol, id) {
+function words5_(str) {
+  if (!str || !String(str).trim()) return '';
+  const w = String(str).trim().split(/\s+/);
+  return w.length <= 5 ? String(str) : w.slice(0, 5).join(' ') + '…';
+}
+
+function readable_(iso) {
+  const d = new Date(iso); if (isNaN(d.getTime())) return new Date().toLocaleString('en-US');
+  return Utilities.formatDate(d, Session.getScriptTimeZone(), 'M/d/yyyy, h:mm:ss a');
+}
+
+// find the row whose column A holds this entry's ISO timestamp (works whether Sheets kept it as text or turned it into a date)
+function findRow_(sh, iso) {
   const last = sh.getLastRow(); if (last < 2) return 0;
-  const vals = sh.getRange(2, idCol, last - 1, 1).getValues();
-  const want = String(id);
-  for (let i = 0; i < vals.length; i++) if (String(vals[i][0]) === want) return i + 2;
+  const want = Date.parse(iso); if (isNaN(want)) return 0;
+  const vals = sh.getRange(2, 1, last - 1, 1).getValues();
+  for (let i = 0; i < vals.length; i++) {
+    const v = vals[i][0]; if (v === '' || v === null) continue;
+    const t = (v instanceof Date) ? v.getTime() : Date.parse(String(v));
+    if (!isNaN(t) && Math.abs(t - want) <= 1) return i + 2;
+  }
   return 0;
 }
 
+function writeRow_(sh, row, p, isNew) {
+  const text = p.text || '', tr = p.transcript || '', tags = p.tags || '';
+  const a = sh.getRange(row, 1); a.setNumberFormat('@'); a.setValue(p.timestamp || new Date().toISOString());
+  if (isNew) sh.getRange(row, 2).setValue(readable_(p.timestamp));
+  sh.getRange(row, 3, 1, 3).setValues([[p.moodScore === undefined || p.moodScore === null ? '' : p.moodScore, p.moodLabel || '', p.type || 'text']]);
+  sh.getRange(row, 6, 1, 2).setValues([[words5_(text), words5_(tr)]]);
+  const f = sh.getRange(row, 6), g = sh.getRange(row, 7);
+  f.setNote((text ? '📝 Full entry:\n\n' + text : '') + (tags ? (text ? '\n\n' : '') + '🏷 Tags: ' + tags : ''));
+  g.setNote(tr ? '🎙 Full transcript:\n\n' + tr : '');
+  sh.getRange(row, 6, 1, 2).setWrapStrategy(SpreadsheetApp.WrapStrategy.CLIP);
+  sh.getRange(row, 8, 1, 3).setValues([[p.latitude || '', p.longitude || '', p.accuracy || '']]);
+  if (p.driveUrl) sh.getRange(row, 11).setFormula('=HYPERLINK("' + p.driveUrl + '","▶ Play audio")');
+  if (p.imageUrl) sh.getRange(row, 12).setFormula('=HYPERLINK("' + p.imageUrl + '","🖼 View image")');
+  try { sh.getRange(row, 1, 1, NCOL).setFontColor(null).setFontLine('none'); } catch (e) {}
+}
+
 function upsert_(p) {
-  const { sh, cols } = prepare_();
-  const c = n => cols[norm_(n)];
-  const idCol = c('_id');
-  let row = findRow_(sh, idCol, p._id);
+  if (!p.timestamp) p.timestamp = new Date().toISOString();
+  const sh = getSheet_();
+  let row = findRow_(sh, p.timestamp);
   const isNew = !row;
   if (isNew) row = sh.getLastRow() + 1;
-  const set = (name, val) => { const col = c(name); if (col) sh.getRange(row, col).setValue(val); };
-  if (isNew) { sh.getRange(row, idCol).setNumberFormat('@'); }
-  set('_id', String(p._id));
-  set('timestamp', p.timestamp || '');
-  set('type', p.type || '');
-  set('moodScore', p.moodScore);
-  set('moodLabel', p.moodLabel || '');
-  set('text', p.text || '');
-  set('transcript', p.transcript || '');
-  set('tags', p.tags || '');
-  set('latitude', p.latitude === undefined ? '' : p.latitude);
-  set('longitude', p.longitude === undefined ? '' : p.longitude);
-  set('accuracy', p.accuracy === undefined ? '' : p.accuracy);
-  if (p.driveUrl) set('driveUrl', p.driveUrl);
-  if (p.imageUrl) set('imageUrl', p.imageUrl);
-  set('updatedAt', p.updatedAt || new Date().toISOString());
-  set('deleted', '');
+  writeRow_(sh, row, p, isNew);
   return { success: true, row: row, created: isNew };
 }
 
 function markDeleted_(p) {
-  const { sh, cols } = prepare_();
-  const row = findRow_(sh, cols['id'], p._id);
-  if (row) { sh.getRange(row, cols['deleted']).setValue('DELETED ' + new Date().toISOString()); sh.getRange(row, 1, 1, sh.getLastColumn()).setFontColor('#999999'); }
+  const sh = getSheet_();
+  const row = p.timestamp ? findRow_(sh, p.timestamp) : 0;
+  if (row) {
+    const r = sh.getRange(row, 1, 1, NCOL);
+    r.setFontColor('#999999').setFontLine('line-through');
+    sh.getRange(row, 1).setNote('Deleted in Moodlog ' + new Date().toISOString());
+  }
   return { success: true, found: !!row };
 }
 
+// One-time clean-up for rows written by the earlier version (v2/v3), which put data in extra columns on the right.
+// It moves everything into the original layout and removes those extra columns. Make a copy of the Sheet first.
+function repairSheet() {
+  const sh = getSheet_();
+  const EXTRA = ['_id', 'timestamp', 'type', 'text', 'transcript', 'tags', 'latitude', 'longitude', 'accuracy', 'driveUrl', 'imageUrl', 'updatedAt', 'deleted'];
+  const lc = sh.getLastColumn(), lr = sh.getLastRow();
+  if (lr < 1 || lc < 1) { Logger.log('Nothing to repair.'); return; }
+  const head = sh.getRange(1, 1, 1, lc).getValues()[0];
+  const col = {}; head.forEach((h, i) => { if (i >= NCOL - 1 && EXTRA.indexOf(h) >= 0 && col[h] === undefined) col[h] = i; });
+  if (col['timestamp'] === undefined && col['_id'] === undefined) { Logger.log('No extra columns found — nothing to repair.'); return; }
+  const data = lr > 1 ? sh.getRange(2, 1, lr - 1, lc).getValues() : [];
+  let moved = 0;
+  data.forEach((r, i) => {
+    const get = n => (col[n] === undefined ? '' : r[col[n]]);
+    const ts = get('timestamp'); if (!ts) return;
+    const iso = (ts instanceof Date) ? ts.toISOString() : String(ts);
+    const row = i + 2;
+    writeRow_(sh, row, {
+      timestamp: iso, type: get('type') || r[4], moodScore: r[2], moodLabel: r[3],
+      text: get('text'), transcript: get('transcript'), tags: get('tags'),
+      latitude: r[7], longitude: r[8], accuracy: r[9], driveUrl: get('driveUrl'), imageUrl: get('imageUrl')
+    }, !r[1]);
+    if (get('deleted')) { sh.getRange(row, 1, 1, NCOL).setFontColor('#999999').setFontLine('line-through'); }
+    moved++;
+  });
+  Object.keys(col).map(k => col[k]).sort((x, y) => y - x).forEach(ci => sh.deleteColumn(ci + 1)); // right-to-left
+  Logger.log('Repaired ' + moved + ' rows and removed the extra columns.');
+}
+
 // ───────────────────────── drive ─────────────────────────
+function getFolder_() {
+  const it = DriveApp.getFoldersByName(DRIVE_FOLDER_NAME);
+  return it.hasNext() ? it.next() : DriveApp.createFolder(DRIVE_FOLDER_NAME);
+}
 function upload_(p) {
-  const it = DriveApp.getFoldersByName(DRIVE_FOLDER);
-  const folder = it.hasNext() ? it.next() : DriveApp.createFolder(DRIVE_FOLDER);
-  const blob = Utilities.newBlob(Utilities.base64Decode(p.data), p.mimeType || 'application/octet-stream', p.filename || ('moodlog-' + Date.now()));
-  const file = folder.createFile(blob);
-  return { success: true, driveUrl: file.getUrl() };
+  const blob = Utilities.newBlob(Utilities.base64Decode(p.data), p.mimeType || 'application/octet-stream', p.filename || ('moodlog-file-' + Date.now()));
+  const file = getFolder_().createFile(blob);
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  return { success: true, driveUrl: 'https://drive.google.com/file/d/' + file.getId() + '/view' };
 }
 
 // ───────────────────────── reminders (Google Calendar) ─────────────────────────
