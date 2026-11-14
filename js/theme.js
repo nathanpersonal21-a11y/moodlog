@@ -10,14 +10,15 @@
     lavender: T('Lavender', '#14111f', '#1c1830', '#251f40', '#b39dff', '#ebe6fa'),
     rose: T('Rose', '#170d12', '#20121a', '#2a1822', '#f08fb0', '#f6e6ec'),
     sunset: T('Sunset', '#1a0f0c', '#25150f', '#311d14', '#ff9a5c', '#f8e9df'),
-    daylight: T('Daylight', '#f6f3ee', '#ffffff', '#ece6db', '#9a6b1f', '#26221c', true)
+    daylight: T('Daylight', '#f6f3ee', '#ffffff', '#ece6db', '#9a6b1f', '#26221c', true),
+    rainbow: Object.assign(T('Rainbow', '#e6f6ff', '#ffffff', '#d9efff', '#e0508a', '#24324d', true), { img: 'img/rainbow-bg.jpg' })
   };
   const rgb = h => [1, 3, 5].map(i => parseInt(h.substr(i, 2), 16));
   const mix = (a, b, t) => { const x = rgb(a), y = rgb(b); return 'rgb(' + x.map((v, i) => Math.round(v + (y[i] - v) * t)).join(',') + ')'; };
 
   ML.applyTheme = function () {
     const id = ML.THEMES[S.settings.theme] ? S.settings.theme : 'midnight', t = ML.THEMES[id];
-    const r = document.documentElement, st = r.style, hasBg = !!S.settings.hasBg;
+    const r = document.documentElement, st = r.style, hasBg = !!S.settings.hasBg || !!t.img;
     const a = rgb(t.accent);
     st.setProperty('--gold', t.accent);
     st.setProperty('--gold-dim', mix(t.accent, t.bg, 0.45));
@@ -31,19 +32,21 @@
     const tr = rgb(t.bg2), t3 = rgb(t.bg3);
     st.setProperty('--bg2', hasBg ? 'rgba(' + tr.join(',') + ',.78)' : t.bg2);
     st.setProperty('--bg3', hasBg ? 'rgba(' + t3.join(',') + ',.85)' : t.bg3);
-    st.setProperty('--bgblur', (S.settings.bgBlur || 0) + 'px');
+    st.setProperty('--bgblur', ((t.img && !S.settings.hasBg) ? 4 : (S.settings.bgBlur || 0)) + 'px');
     r.style.colorScheme = t.light ? 'light' : 'dark';
     r.classList.toggle('has-bg', hasBg);
     const meta = document.querySelector('meta[name=theme-color]'); if (meta) meta.setAttribute('content', t.bg);
     const dim = document.getElementById('bg-dim');
-    if (dim) dim.style.background = 'rgba(' + rgb(t.bg).join(',') + ',' + ((S.settings.bgDim || 0) / 100) + ')';
+    if (dim) dim.style.background = 'rgba(' + rgb(t.bg).join(',') + ',' + (((t.img && !S.settings.hasBg) ? 12 : (S.settings.bgDim || 0)) / 100) + ')';
     document.body.style.background = hasBg ? 'transparent' : t.bg;
     if (ML.dial && ML.dial.redraw) ML.dial.redraw();
   };
 
   ML.applyBackground = async function () {
     const layer = document.getElementById('bg-layer'); if (!layer) return;
-    if (S.settings.hasBg) {
+    const th = ML.THEMES[S.settings.theme];
+    if (!S.settings.hasBg && th && th.img) { layer.style.backgroundImage = 'url("' + th.img + '")'; }
+    else if (S.settings.hasBg) {
       const u = await ML.blob.url('bg');
       if (u) { layer.style.backgroundImage = 'url("' + u + '")'; } else { S.settings.hasBg = false; ML.save('settings'); }
     } else layer.style.backgroundImage = '';

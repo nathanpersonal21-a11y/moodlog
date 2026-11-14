@@ -12,14 +12,15 @@
 
   const defaultSettings = () => ({
     theme: 'midnight', bgDim: 55, bgBlur: 6, hasBg: false, hasIcon: false,
-    scriptUrl: '', scriptToken: '', haptics: true, lockAfter: 5, checkinGapHours: 4, confetti: true, sound: false,
+    scriptUrl: '', scriptToken: '', fx: {}, haptics: true, lockAfter: 5, checkinGapHours: 4, confetti: true, sound: false,
     cloudProvider: 'off', cloudKey: '',
     reminders: { enabled: false, same: true, time: '20:00', days: Array.from({ length: 7 }, () => ({ on: true, time: '20:00' })), lastSync: 0 }
   });
 
-  const S = (ML.S = { settings: defaultSettings(), checkins: [], entries: [], habits: [], habitLog: {}, tags: [], todos: [], queue: [] });
-  const KEYS = { settings: 'ml2_settings', checkins: 'ml2_checkins', entries: 'ml2_entries', habits: 'ml2_habits', habitLog: 'ml2_habitlog', tags: 'ml2_tags', todos: 'ml2_todos', queue: 'ml2_queue' };
+  const S = (ML.S = { settings: defaultSettings(), checkins: [], entries: [], habits: [], habitLog: {}, tags: [], todos: [], queue: [], game: null });
+  const KEYS = { settings: 'ml2_settings', checkins: 'ml2_checkins', entries: 'ml2_entries', habits: 'ml2_habits', habitLog: 'ml2_habitlog', tags: 'ml2_tags', todos: 'ml2_todos', queue: 'ml2_queue', game: 'ml2_game' };
   ML.save = k => LS.set(KEYS[k], S[k]);
+  ML.fx = n => !(S.settings.fx && S.settings.fx[n] === false); // each reward feature can be switched off in Settings
 
   // ── IndexedDB blobs ──
   let dbp = null;
@@ -123,6 +124,8 @@
     if (st) { const d = defaultSettings(); S.settings = Object.assign(d, st, { reminders: Object.assign(d.reminders, st.reminders || {}) }); }
     S.checkins = LS.get(KEYS.checkins, []); S.entries = LS.get(KEYS.entries, []); S.habits = LS.get(KEYS.habits, []);
     S.habitLog = LS.get(KEYS.habitLog, {}); S.tags = LS.get(KEYS.tags, []); S.todos = LS.get(KEYS.todos, []); S.queue = LS.get(KEYS.queue, []);
+    S.game = Object.assign({ xp: 0, dayXp: {}, badges: {}, ringDays: {}, paid: {}, comboBest: 0, trivia: { played: 0, correct: 0, perfect: 0, best: 0 } }, LS.get(KEYS.game, {}));
+    if (!S.settings.fx) S.settings.fx = {};
     foldCheckinsIntoEntries();
     if (!localStorage.getItem('ml2_migrated')) {
       try { await migrate(); } catch (e) { console.error('migration failed', e); }

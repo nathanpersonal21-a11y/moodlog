@@ -38,7 +38,7 @@
       d.querySelector('.h-info').onclick = () => editSheet(h);
       d.querySelector('.h-emoji').onclick = () => editSheet(h);
       const chk = d.querySelector('.h-check');
-      chk.onclick = () => { const nowDone = ML.data.toggleHabit(h.id, sel); ML.haptic(nowDone ? 'bump' : 'tick'); if (nowDone) ML.celebrate(chk, false); chk.classList.add('pop'); setTimeout(render, 160); };
+      chk.onclick = () => { const nowDone = ML.data.toggleHabit(h.id, sel); ML.haptic(nowDone ? 'bump' : 'tick'); if (nowDone) ML.rewards.onHabit(chk, h, sel); else ML.rewards.renderStrip(); chk.classList.add('pop'); setTimeout(render, 160); };
       return d;
     };
     const dueBox = $('#h-due', body); if (dueBox) due.forEach(h => dueBox.appendChild(card(h, false)));

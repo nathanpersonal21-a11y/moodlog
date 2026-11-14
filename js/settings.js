@@ -4,6 +4,7 @@
   const pick = (accept, cb) => { const i = document.createElement('input'); i.type = 'file'; i.accept = accept; i.onchange = () => { if (i.files[0]) cb(i.files[0]); }; i.click(); };
   const sw = (id, on) => '<label class="switch"><input type="checkbox" id="' + id + '"' + (on ? ' checked' : '') + '><span></span></label>';
 
+  const FX = [['save', 'Save celebration', 'Popup, confetti and chime when you save an entry'], ['xp', 'XP & levels', 'Earn points for entries, tasks and habits'], ['streak', 'Streak flame', 'Daily streak with one forgiven day a week'], ['ring', 'Daily goal ring', 'Entry + tasks + habits closes your ring'], ['bonus', 'Surprise 2x bonuses', 'Random lucky double XP'], ['combo', 'Task combos', 'Quick back-to-back tasks and clear-the-day bonus'], ['insights', 'Insights after saving', 'A little pattern or kind note with each entry'], ['memories', 'On this day', 'Show entries from past years on this date'], ['badges', 'Badges', 'Unlock them as you go'], ['heatmap', 'Mood heatmap', 'Calendar of your mood colours'], ['recap', 'Weekly recap', 'Your week at a glance, shareable'], ['rainbow', 'Rainbows & sparkles', 'Rainbow arcs on popups and rewards'], ['buddy', 'Buddy mascot', 'The little buddy in popups'], ['trivia', 'Swiftie trivia game', 'Taylor Swift song and album trivia'], ['anim', 'Extra animations', 'Count-ups, pops and glows']];
   function render() {
     const body = $('#settings-body'); if (!body) return;
     const st = S.settings, rm = st.reminders;
@@ -30,7 +31,7 @@
     h += '<div class="set-sec"><div class="set-h">Voice transcription</div><div class="card" style="display:flex;flex-direction:column;gap:.8rem"><div class="hint">By default voice notes use your phone’s built-in speech recognition. When you’re online you can also let a better cloud model re-transcribe each recording (nothing to download). It needs your own API key — Groq has a free tier. The key stays on this device.</div><select class="select" id="s-cloud"><option value="off"' + (st.cloudProvider === 'off' ? ' selected' : '') + '>Phone speech recognition only</option><option value="groq"' + (st.cloudProvider === 'groq' ? ' selected' : '') + '>Cloud model — Groq (free tier)</option><option value="openai"' + (st.cloudProvider === 'openai' ? ' selected' : '') + '>Cloud model — OpenAI (paid)</option></select>' + (st.cloudProvider !== 'off' ? '<input type="password" class="input mono" id="s-cloudkey" placeholder="API key" value="' + esc(st.cloudKey) + '" autocomplete="off" style="font-size:12.5px">' : '') + '</div></div>';
     // Lock & feel
     h += '<div class="set-sec"><div class="set-h">Lock &amp; feel</div><div class="card" style="display:flex;flex-direction:column;gap:.9rem"><div class="set-line"><div><div class="l">Lock again after being away</div><div class="d">Passcode screen when you come back to the app.</div></div><select class="select" id="s-lock" style="width:auto"><option value="0">Immediately</option><option value="1">1 minute</option><option value="5">5 minutes</option><option value="15">15 minutes</option><option value="60">1 hour</option><option value="-1">Only on app start</option></select></div><div class="set-line"><div><div class="l">Haptic feedback</div><div class="d">Little taps on the dial and buttons.</div></div>' + sw('s-hap', st.haptics) + '</div><div class="set-line"><div><div class="l">Ask my mood when I open the app</div><div class="d">Shows the mood dial at start unless you logged within this long.</div></div><select class="select" id="s-gap" style="width:auto"><option value="0">Every time</option><option value="2">2 hours</option><option value="4">4 hours</option><option value="8">8 hours</option><option value="24">1 day</option></select></div></div></div>';
-    h += '<div class="set-sec"><div class="set-h">Celebrations</div><div class="card" style="display:flex;flex-direction:column;gap:.9rem"><div class="set-line"><div><div class="l">Confetti</div><div class="d">When you tick off a to-do or a habit.</div></div>' + sw('s-conf', st.confetti !== false) + '</div><div class="set-line"><div><div class="l">Celebration sound</div><div class="d">A little chime with the confetti. The iPhone silent switch mutes it.</div></div>' + sw('s-snd', !!st.sound) + '</div><button class="btn-secondary" id="s-celeb">🎉 Try it</button></div></div>';
+    h += '<div class="set-sec"><div class="set-h">Rewards &amp; fun</div><div class="card" style="display:flex;flex-direction:column;gap:.9rem"><div class="set-line"><div><div class="l">Confetti</div><div class="d">When you finish something.</div></div>' + sw('s-conf', st.confetti !== false) + '</div><div class="set-line"><div><div class="l">Celebration sound</div><div class="d">Plays even in silent mode on iPhone (turn your volume up).</div></div>' + sw('s-snd', !!st.sound) + '</div>' + FX.map(f => '<div class="set-line"><div><div class="l">' + f[1] + '</div><div class="d">' + f[2] + '</div></div>' + sw('fx-' + f[0], ML.fx(f[0])) + '</div>').join('') + '<button class="btn-secondary" id="s-celeb">🎉 Try it</button></div></div>';
     // Data
     h += '<div class="set-sec"><div class="set-h">Your data</div><div class="card" style="display:flex;flex-direction:column;gap:.7rem"><div class="hint" id="s-storage">Calculating storage…</div><button class="btn-secondary" id="s-export">Export backup (JSON)</button><button class="btn-secondary" id="s-import">Import backup</button></div><div class="hint" style="text-align:center">Moodlog v2 · everything is stored on this device' + (st.scriptUrl ? ' and backed up to your sheet' : '') + '</div></div>';
     body.innerHTML = h; wire(body); fillDynamic(body);
@@ -65,7 +66,7 @@
   }
 
   function wire(body) {
-    body.querySelectorAll('.theme-sw').forEach(b => b.onclick = () => { S.settings.theme = b.dataset.t; ML.save('settings'); ML.applyTheme(); ML.haptic('tick'); render(); });
+    body.querySelectorAll('.theme-sw').forEach(b => b.onclick = () => { S.settings.theme = b.dataset.t; ML.save('settings'); ML.applyBackground(); ML.haptic('tick'); render(); });
     $('#s-bg', body).onclick = () => pick('image/*', async f => { try { await ML.setBackground(f); render(); } catch (e) { ML.toast('Could not use that picture'); } });
     const rb = $('#s-bg-rm', body); if (rb) rb.onclick = async () => { await ML.clearBackground(); render(); };
     const dim = $('#s-dim', body); if (dim) dim.oninput = e => { S.settings.bgDim = +e.target.value; ML.save('settings'); ML.applyTheme(); e.target.previousElementSibling.textContent = 'Dim · ' + e.target.value + '%'; };
@@ -102,12 +103,13 @@
     $('#s-gap', body).onchange = e => { S.settings.checkinGapHours = +e.target.value; ML.save('settings'); ML.renderJournal(); };
     $('#s-conf', body).onchange = e => { S.settings.confetti = e.target.checked; ML.save('settings'); };
     $('#s-snd', body).onchange = e => { S.settings.sound = e.target.checked; ML.save('settings'); if (e.target.checked) { ML.sound.unlock(); ML.sound.play('ping'); } };
-    $('#s-celeb', body).onclick = () => ML.celebrate($('#s-celeb', body), true);
+    FX.forEach(f => { $('#fx-' + f[0], body).onchange = e => { S.settings.fx[f[0]] = e.target.checked; ML.save('settings'); document.documentElement.classList.toggle('noanim', !ML.fx('anim')); ML.rewards.renderStrip(); ML.renderJournal(); }; });
+    $('#s-celeb', body).onclick = () => { ML.celebrate($('#s-celeb', body), true); ML.rewards.pop({ title: 'Test celebration', xp: 25, lines: ['💡 This is how rewards look.'] }); };
     $('#s-hap', body).onchange = e => { S.settings.haptics = e.target.checked; ML.save('settings'); if (e.target.checked) ML.haptic('bump'); };
 
     $('#s-export', body).onclick = async () => {
       const set = Object.assign({}, S.settings); delete set.cloudKey; delete set.scriptToken;
-      const data = JSON.stringify({ app: 'moodlog', version: 2, exportedAt: new Date().toISOString(), settings: set, entries: S.entries, todos: S.todos, habits: S.habits, habitLog: S.habitLog, tags: S.tags }, null, 1);
+      const data = JSON.stringify({ app: 'moodlog', version: 2, exportedAt: new Date().toISOString(), settings: set, entries: S.entries, todos: S.todos, game: S.game, habits: S.habits, habitLog: S.habitLog, tags: S.tags }, null, 1);
       const file = new File([data], 'moodlog-backup-' + ML.todayKey() + '.json', { type: 'application/json' });
       try { if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: 'Moodlog backup' }); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
       const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = file.name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
@@ -119,6 +121,7 @@
         (d.tags || []).forEach(t => { if (!has(S.tags, t.id)) S.tags.push(t); });
         (d.entries || []).forEach(e => { if (!has(S.entries, e.id)) { e.photoId = null; e.audioId = null; e.synced = false; S.entries.push(e); n++; } });
         (d.checkins || []).forEach(c => { if (!c.legacy && !has(S.entries, c.id)) { S.entries.push({ id: c.id, ts: c.ts, updatedAt: c.updatedAt || c.ts, type: 'text', mood: c.mood, moodLabel: c.label || '', text: c.note || '', transcript: '', tags: c.tags || [], loc: null, photoId: null, audioId: null, imageUrl: null, driveUrl: null, synced: false }); n++; } });
+        if (d.game && (d.game.xp || 0) > (S.game.xp || 0)) { S.game = Object.assign(S.game, d.game); ML.save('game'); n++; }
         (d.todos || []).forEach(t => { if (!has(S.todos, t.id)) { S.todos.push(t); n++; } });
         (d.habits || []).forEach(h => { if (!has(S.habits, h.id)) S.habits.push(h); });
         Object.keys(d.habitLog || {}).forEach(k => { const a = S.habitLog[k] || []; S.habitLog[k] = [...new Set([...a, ...d.habitLog[k]])]; });

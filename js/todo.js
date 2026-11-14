@@ -47,7 +47,7 @@
       chk.onclick = () => {
         t.done = !t.done; t.doneAt = t.done ? Date.now() : null; ML.save('todos'); ML.haptic(t.done ? 'bump' : 'tick');
         row.classList.toggle('done', t.done); chk.classList.toggle('done', t.done); chk.textContent = t.done ? '✓' : ''; chk.classList.add('pop');
-        if (t.done) ML.celebrate(chk, forDay(sel).every(x => x.done));
+        if (t.done) ML.rewards.onTask(chk, t, forDay(sel).every(x => x.done)); else ML.rewards.renderStrip();
         setTimeout(render, 700);
       };
       row.querySelector('.td-title').onclick = () => edit(t); row.querySelector('.td-more').onclick = () => edit(t);

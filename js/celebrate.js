@@ -1,37 +1,62 @@
-/* Moodlog — celebrations: confetti + an optional synthesised chime (no audio files, works offline).
-   Both can be switched on/off in the To-do tab and in Settings. iPhone note: the silent switch mutes web audio. */
+/* Moodlog — celebrations: confetti + synthesised chimes (no audio files, works offline).
+   Sounds are rendered to little WAV files and played through <audio> elements: unlike Web Audio, <audio> keeps playing
+   when the iPhone silent switch is on, and navigator.audioSession ("playback") is set where Safari supports it. */
 (function () {
   const ML = window.ML, S = ML.S;
 
-  // ── sound (Web Audio) ──
-  let ac = null;
-  const audio = () => {
-    try {
-      if (!ac) { const A = window.AudioContext || window.webkitAudioContext; if (!A) return null; ac = new A(); }
-      if (ac.state === 'suspended') ac.resume();
-      return ac;
-    } catch (e) { return null; }
+  const SR = 22050;
+  const wave = (type, ph) => type === 'sine' ? Math.sin(ph) : type === 'triangle' ? (2 / Math.PI) * Math.asin(Math.sin(ph)) : Math.sin(ph) + 0.3 * Math.sin(2 * ph);
+  // notes: [freq, start s, length s, type, gain]
+  function render(notes) {
+    const total = Math.max.apply(null, notes.map(n => n[1] + n[2])) + 0.08, f = new Float32Array(Math.ceil(total * SR));
+    notes.forEach(([fr, t0, d, type, g]) => {
+      const a = Math.floor(t0 * SR), n = Math.floor(d * SR);
+      for (let i = 0; i < n && a + i < f.length; i++) {
+        const t = i / SR, env = Math.min(1, t / 0.012) * Math.exp(-4.2 * t / d) * (i > n - 200 ? (n - i) / 200 : 1);
+        f[a + i] += wave(type, 2 * Math.PI * fr * t) * g * env;
+      }
+    });
+    return f;
+  }
+  function toWav(f) {
+    const b = new ArrayBuffer(44 + f.length * 2), v = new DataView(b), w = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+    w(0, 'RIFF'); v.setUint32(4, 36 + f.length * 2, true); w(8, 'WAVEfmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+    v.setUint32(24, SR, true); v.setUint32(28, SR * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, 'data'); v.setUint32(40, f.length * 2, true);
+    for (let i = 0; i < f.length; i++) v.setInt16(44 + i * 2, Math.max(-1, Math.min(1, f[i])) * 32767, true);
+    return new Blob([b], { type: 'audio/wav' });
+  }
+  const arp = (fs, gap, len, type, g) => fs.map((fr, i) => [fr, i * gap, len, type, g]);
+  const SOUNDS = {
+    ping: () => [[880, 0, 0.22, 'triangle', 0.3], [1318.5, 0.08, 0.32, 'triangle', 0.26]],
+    big: () => arp([523.25, 659.25, 783.99, 1046.5, 1318.5], 0.085, 0.55, 'triangle', 0.3).concat([[1046.5, 0.5, 1.0, 'sine', 0.24], [1568, 0.52, 0.9, 'sine', 0.14]]),
+    save: () => arp([659.25, 880, 1174.7], 0.09, 0.3, 'triangle', 0.28),
+    level: () => arp([523.25, 659.25, 783.99, 1046.5, 1318.5, 1568], 0.09, 0.5, 'triangle', 0.28).concat([[2093, 0.6, 0.9, 'sine', 0.14], [1046.5, 0.55, 1.1, 'sine', 0.2]]),
+    badge: () => arp([784, 988, 1175, 1568], 0.1, 0.45, 'triangle', 0.28).concat([[2349, 0.42, 0.7, 'sine', 0.12]]),
+    bonus: () => arp([1568, 2093, 2637, 3136], 0.06, 0.25, 'sine', 0.2),
+    good: () => [[988, 0, 0.16, 'triangle', 0.3], [1318.5, 0.09, 0.3, 'triangle', 0.28]],
+    bad: () => [[330, 0, 0.22, 'sine', 0.3], [247, 0.14, 0.34, 'sine', 0.28]]
   };
-  function tone(freq, t0, dur, type, gain) {
-    const o = ac.createOscillator(), g = ac.createGain();
-    o.type = type; o.frequency.value = freq;
-    g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(gain, t0 + 0.012); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-    o.connect(g); g.connect(ac.destination); o.start(t0); o.stop(t0 + dur + 0.03);
+  const pool = {}; let unlocked = false;
+  function get(kind) {
+    if (pool[kind]) return pool[kind];
+    try { const a = new Audio(URL.createObjectURL(toWav(render(SOUNDS[kind]())))); a.preload = 'auto'; a.setAttribute('playsinline', ''); pool[kind] = a; return a; } catch (e) { return null; }
+  }
+  function unlock() {
+    try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
+    if (unlocked) return; unlocked = true;
+    Object.keys(SOUNDS).forEach(k => { const a = get(k); if (!a) return; a.muted = true; const p = a.play(); const back = () => { try { a.pause(); a.currentTime = 0; a.muted = false; } catch (e) {} }; if (p && p.then) p.then(back, () => { a.muted = false; unlocked = false; }); else back(); });
   }
   ML.sound = {
-    unlock() { audio(); },
-    // kind: 'ping' (one task) or 'big' (everything done)
+    unlock,
     play(kind) {
       if (!S.settings.sound) return;
-      const c = audio(); if (!c) return; const t = c.currentTime + 0.02;
-      if (kind === 'big') {
-        [523.25, 659.25, 783.99, 1046.5, 1318.5].forEach((f, i) => tone(f, t + i * 0.085, 0.55, 'triangle', 0.16));
-        tone(1046.5, t + 0.5, 1.0, 'sine', 0.12); tone(1568, t + 0.52, 0.9, 'sine', 0.07);
-      } else { tone(880, t, 0.22, 'triangle', 0.15); tone(1318.5, t + 0.08, 0.32, 'triangle', 0.13); }
+      try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
+      const a = get(kind === 'big' || SOUNDS[kind] ? kind : 'ping'); if (!a) return;
+      try { a.muted = false; a.currentTime = 0; const p = a.play(); if (p && p.catch) p.catch(() => {}); } catch (e) {}
     }
   };
   // the first touch anywhere unlocks audio on iPhone, so the first celebration is audible
-  document.addEventListener('pointerdown', () => { if (S.settings.sound) ML.sound.unlock(); }, { once: false, passive: true });
+  document.addEventListener('pointerdown', () => { if (S.settings.sound) unlock(); }, { passive: true });
 
   // ── confetti ──
   let cv = null, cx = null, parts = [], raf = 0, W = 0, H = 0, dpr = 1, last = 0;
@@ -64,7 +89,7 @@
   }
 
   // el: element the burst comes from (e.g. the check button); big: everything is finished
-  ML.celebrate = (el, big) => {
+  ML.celebrate = (el, big, silent) => {
     if (S.settings.confetti !== false) {
       ensure();
       const r = el && el.getBoundingClientRect ? el.getBoundingClientRect() : { left: W / 2, top: H / 2, width: 0, height: 0 };
@@ -73,6 +98,6 @@
       if (big) { burst(0, H, 70, 1.1, 20, true); parts.slice(-70).forEach(p => { p.vx = Math.abs(p.vx) * 0.9 + 2; p.vy = -Math.abs(p.vy) - 4; }); burst(W, H, 70, 1.1, 20, true); parts.slice(-70).forEach(p => { p.vx = -Math.abs(p.vx) * 0.9 - 2; p.vy = -Math.abs(p.vy) - 4; }); for (let i = 0; i < 70; i++) burst(Math.random() * W, -10 - Math.random() * 120, 1, 0.8, 2, false); }
       if (!raf) { last = performance.now(); raf = requestAnimationFrame(frame); }
     }
-    ML.sound.play(big ? 'big' : 'ping');
+    if (!silent) ML.sound.play(big ? 'big' : 'ping');
   };
 })();

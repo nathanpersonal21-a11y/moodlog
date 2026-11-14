@@ -121,8 +121,9 @@
     try {
       let audioId = null;
       if (b) { audioId = 'audio:' + id; await ML.blob.put(audioId, b); }
-      ML.data.addEntry({ id, ts, updatedAt: ts, type: 'voice', mood: m.mood, moodLabel: m.label, text: '', transcript: tr, tags, loc, photoId: null, audioId, imageUrl: null, driveUrl: null, synced: false });
-      ML.refreshHome();
+      const rec = { id, ts, updatedAt: ts, type: 'voice', mood: m.mood, moodLabel: m.label, text: '', transcript: tr, tags, loc, photoId: null, audioId, imageUrl: null, driveUrl: null, synced: false };
+      ML.data.addEntry(rec);
+      ML.refreshHome(); ML.rewards.onEntry(rec);
     } finally { saving = false; }
   }
 

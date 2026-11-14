@@ -14,7 +14,7 @@
     const today = last && ML.dayKey(last.ts) === ML.todayKey();
     $('#pillsc').textContent = today ? last.mood : '—'; $('#pillsc').style.color = today ? ML.moodColor(last.mood) : '';
     $('#pilllbl').textContent = today ? (last.moodLabel || ML.moodWord(last.mood)) : 'log mood';
-    ML.renderJournal();
+    ML.renderJournal(); ML.rewards.renderStrip();
     const active = (ML.$('.tab-panel.active') || {}).id;
     if (active === 'tab-trends') ML.renderTrends(); else if (active === 'tab-habits') ML.renderHabits();
   };
@@ -47,7 +47,7 @@
     iphone();
     await ML.loadStore();
     ML.applyTheme(); ML.applyBackground(); ML.applyIcon();
-    ML.lock.init(); ML.initJournal(); ML.initVoice(); ML.sync.init(); ML.initTodo();
+    ML.lock.init(); ML.initJournal(); ML.initVoice(); ML.sync.init(); ML.initTodo(); ML.initRewards();
     ML.$$('.tab').forEach(t => t.addEventListener('click', () => ML.showTab(t.dataset.tab)));
     const badge = $('#mood-badge'); badge.addEventListener('click', () => ML.openCompose());
     badge.addEventListener('keydown', e => { if (e.key === 'Enter') badge.click(); });

@@ -46,6 +46,12 @@
     </div></div>
   </div>
 
+  <!-- REWARDS -->
+  <div id="srewards" class="screen">
+    <div class="sub-hdr"><button class="btn-back" id="rw-back" aria-label="Back">←</button><div class="sub-title">Rewards</div></div>
+    <div class="scroll"><div class="body-pad" id="rw-body"></div></div>
+  </div>
+
   <!-- MAIN -->
   <div id="smain" class="screen">
     <div class="home-hdr">
@@ -61,6 +67,7 @@
         <div class="filter-chips chips hidden" id="filter-chips"></div>
         <div class="result-count hidden" id="result-count"></div>
         <div class="scroll" id="journal-scroll">
+          <div class="rw-strip hidden" id="rw-strip" role="button" tabindex="0"></div>
           <div class="card ci-prompt hidden" id="ci-prompt"><div class="entry-ico">◐</div><div class="grow"><div class="t">Log how you feel</div><div class="s" id="ci-prompt-sub"></div></div><span class="muted">›</span></div>
           <div id="otd-banner" class="otd-banner hidden"><div class="otd-header" id="otd-header"><div class="otd-title">✦ On this day</div><div class="otd-chev">▼</div></div><div class="otd-body" id="otd-body"></div></div>
           <div id="entries-list"></div>
@@ -140,6 +147,8 @@
 <script src="js/celebrate.js"></script>
 <script src="js/journal.js"></script>
 <script src="js/voice.js"></script>
+<script src="js/rewards.js"></script>
+<script src="js/trivia.js"></script>
 <script src="js/todo.js"></script>
 <script src="js/habits.js"></script>
 <script src="js/trends.js"></script>

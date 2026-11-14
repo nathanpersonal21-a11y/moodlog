@@ -47,7 +47,7 @@
 
   function renderOTD() {
     const banner = $('#otd-banner');
-    if (isFiltered()) { banner.classList.add('hidden'); return; }
+    if (isFiltered() || !ML.fx('memories')) { banner.classList.add('hidden'); return; }
     const now = new Date(), tk = ML.todayKey();
     const m = S.entries.filter(e => { const d = new Date(e.ts); return d.getMonth() === now.getMonth() && d.getDate() === now.getDate() && ML.dayKey(e.ts) !== tk; }).sort((a, b) => b.ts - a.ts);
     if (!m.length) { banner.classList.add('hidden'); return; }
@@ -171,6 +171,7 @@
     // grab everything first, then leave the screen at once so saving feels instant; the work finishes right behind it
     const m = picker.get(), id = cId, tags = [...cTags], loc = cLoc, pb = cPhotoBlob, removed = cPhotoRemoved;
     ML.haptic('bump'); ML.ss('smain'); ML.toast(id ? 'Entry updated' : 'Entry saved');
+    let saved = null;
     try {
       if (id) {
         const rec = S.entries.find(e => e.id === id); let photoId = rec.photoId;
@@ -182,9 +183,11 @@
       } else {
         const nid = ML.uid(); let photoId = null;
         if (pb) { photoId = 'photo:' + nid; await ML.blob.put(photoId, pb); }
-        ML.data.addEntry({ id: nid, ts: Date.now(), updatedAt: Date.now(), type: 'text', mood: m.mood, moodLabel: m.label, text, transcript: '', tags, loc, photoId, audioId: null, imageUrl: null, driveUrl: null, synced: false });
+        saved = { id: nid, ts: Date.now(), updatedAt: Date.now(), type: 'text', mood: m.mood, moodLabel: m.label, text, transcript: '', tags, loc, photoId, audioId: null, imageUrl: null, driveUrl: null, synced: false };
+        ML.data.addEntry(saved);
       }
       ML.refreshHome();
+      if (!id && saved) ML.rewards.onEntry(saved);
     } finally { saving = false; }
   }
   let saving = false;
